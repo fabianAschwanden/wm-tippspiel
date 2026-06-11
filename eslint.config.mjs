@@ -47,6 +47,8 @@ const config = typescriptEslint.config(
         typescript: true,
         node: true,
       },
+      // node:sqlite ist erst ab Node 22.5 in builtinModules — für Lint-Läufe auf älteren Runnern
+      "import/core-modules": ["node:sqlite"],
     },
     rules: {
       "@typescript-eslint/no-unused-vars": [
