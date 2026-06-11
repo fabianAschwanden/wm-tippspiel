@@ -1,5 +1,6 @@
 import { Metadata } from "next"
 import Link from "next/link"
+import { UserMenu } from "components/UserMenu/UserMenu"
 import "styles/tailwind.css"
 
 export const metadata: Metadata = {
@@ -25,7 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 WM-Tippspiel <span className="text-amber-300">2026</span>
               </span>
             </Link>
-            <nav className="flex gap-1 text-sm font-medium">
+            <nav className="flex items-center gap-1 text-sm font-medium">
               {NAV.map(({ href, label }) => (
                 <Link
                   key={href}
@@ -35,12 +36,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   {label}
                 </Link>
               ))}
+              <UserMenu />
             </nav>
           </div>
         </header>
         <main className="mx-auto max-w-3xl px-4 py-6 pb-16">{children}</main>
         <footer className="border-t border-emerald-900/40 py-6 text-center text-xs text-gray-500">
-          Demo-Applikation auf Basis des website-templates — Tipps werden lokal im Browser gespeichert.
+          Demo-Applikation auf Basis des website-templates — Anmeldung per E-Mail, Tipps werden zentral gespeichert.
         </footer>
       </body>
     </html>

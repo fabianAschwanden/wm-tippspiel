@@ -3,11 +3,10 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { ScoringRules } from "components/ScoringRules/ScoringRules"
-import { CURRENT_USER_NAME, MATCHES } from "lib/data"
-import { buildLeaderboard, rankOf } from "lib/leaderboard"
-import { totalPoints } from "lib/scoring"
-import { loadTips } from "lib/tips"
-import type { Tips } from "lib/types"
+import { fetchLeaderboard, fetchMe } from "lib/api"
+import { MATCHES } from "lib/data"
+import { rankOf } from "lib/leaderboard"
+import type { Player, PlayerAccount } from "lib/types"
 
 const kickoffFormat = new Intl.DateTimeFormat("de-CH", {
   weekday: "short",
@@ -19,38 +18,69 @@ const kickoffFormat = new Intl.DateTimeFormat("de-CH", {
 })
 
 export default function Dashboard() {
-  const [tips, setTips] = useState<Tips | null>(null)
+  const [player, setPlayer] = useState<PlayerAccount | null>(null)
+  const [leaderboard, setLeaderboard] = useState<Player[]>([])
+  const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
-    setTips(loadTips())
+    void Promise.all([fetchMe(), fetchLeaderboard()]).then(([me, players]) => {
+      setPlayer(me)
+      setLeaderboard(players)
+      setLoaded(true)
+    })
   }, [])
 
-  const points = tips ? totalPoints(tips, MATCHES) : 0
-  const leaderboard = buildLeaderboard(tips ?? {})
-  const rank = rankOf(leaderboard, CURRENT_USER_NAME)
-  const upcoming = MATCHES.filter((m) => !m.result).slice(0, 4)
+  const points = leaderboard.find((p) => p.isCurrentUser)?.points ?? 0
+  const rank = player ? rankOf(leaderboard, player.id) : 0
+  const upcoming = MATCHES.filter((m) => !m.result)
+    .sort((a, b) => a.kickoff.localeCompare(b.kickoff))
+    .slice(0, 4)
 
   return (
     <div className="space-y-8">
-      {/* Punktestand */}
-      <section className="rounded-3xl border border-emerald-800/60 bg-gradient-to-br from-emerald-950 to-gray-900 p-6 shadow-lg">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-sm tracking-widest text-emerald-300 uppercase">Dein Punktestand</p>
-            <p className="mt-1 text-5xl font-extrabold text-white tabular-nums">
-              {tips ? points : "–"}
-              <span className="ml-2 text-lg font-medium text-gray-400">Punkte</span>
-            </p>
-            <p className="mt-2 text-sm text-gray-300">
-              Rang <span className="font-bold text-amber-300">{tips ? rank : "–"}</span> von {leaderboard.length} —{" "}
-              <Link href="/rangliste" className="text-emerald-300 underline-offset-2 hover:underline">
-                zur Rangliste
+      {/* Punktestand bzw. Registrierungs-Aufruf */}
+      {loaded && !player ? (
+        <section className="rounded-3xl border border-emerald-800/60 bg-gradient-to-br from-emerald-950 to-gray-900 p-6 shadow-lg">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-sm tracking-widest text-emerald-300 uppercase">Mittippen?</p>
+              <p className="mt-1 text-2xl font-extrabold text-white">Registriere dich mit deiner E-Mail.</p>
+              <p className="mt-2 text-sm text-gray-300">
+                Danach kannst du alle 104 WM-Spiele tippen und in der Rangliste angreifen.
+              </p>
+              <Link
+                href="/anmelden"
+                className="mt-4 inline-block rounded-full bg-emerald-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-500"
+              >
+                Jetzt registrieren
               </Link>
-            </p>
+            </div>
+            <ScoringRules />
           </div>
-          <ScoringRules />
-        </div>
-      </section>
+        </section>
+      ) : (
+        <section className="rounded-3xl border border-emerald-800/60 bg-gradient-to-br from-emerald-950 to-gray-900 p-6 shadow-lg">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-sm tracking-widest text-emerald-300 uppercase">
+                {player ? `Dein Punktestand, ${player.name}` : "Dein Punktestand"}
+              </p>
+              <p className="mt-1 text-5xl font-extrabold text-white tabular-nums">
+                {loaded ? points : "–"}
+                <span className="ml-2 text-lg font-medium text-gray-400">Punkte</span>
+              </p>
+              <p className="mt-2 text-sm text-gray-300">
+                Rang <span className="font-bold text-amber-300">{loaded && rank > 0 ? rank : "–"}</span> von{" "}
+                {leaderboard.length} —{" "}
+                <Link href="/rangliste" className="text-emerald-300 underline-offset-2 hover:underline">
+                  zur Rangliste
+                </Link>
+              </p>
+            </div>
+            <ScoringRules />
+          </div>
+        </section>
+      )}
 
       {/* Nächste Spiele */}
       <section>
@@ -84,7 +114,10 @@ export default function Dashboard() {
                 <p className="font-medium text-emerald-300">
                   {match.stage === "Gruppenphase" ? `Gruppe ${match.group}` : match.stage}
                 </p>
-                <p>{kickoffFormat.format(new Date(match.kickoff))}</p>
+                <p>
+                  {kickoffFormat.format(new Date(match.kickoff))}
+                  {match.venue ? ` · ${match.venue}` : ""}
+                </p>
               </div>
             </li>
           ))}

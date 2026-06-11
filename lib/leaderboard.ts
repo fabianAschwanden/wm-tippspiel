@@ -1,13 +1,24 @@
-import { CURRENT_USER_NAME, MATCHES, OTHER_PLAYERS } from "./data"
 import { totalPoints } from "./scoring"
-import type { Player, Tips } from "./types"
+import type { Match, Player, Tips } from "./types"
 
-/** Rangliste inkl. aktuellem Nutzer, absteigend nach Punkten. */
-export function buildLeaderboard(tips: Tips): Player[] {
-  const me: Player = { name: CURRENT_USER_NAME, points: totalPoints(tips, MATCHES), isCurrentUser: true }
-  return [...OTHER_PLAYERS, me].sort((a, b) => b.points - a.points)
+export interface LeaderboardEntry {
+  id: number
+  name: string
+  tips: Tips
 }
 
-export function rankOf(players: Player[], name: string): number {
-  return players.findIndex((p) => p.name === name) + 1
+/** Rangliste über alle Spieler:innen, absteigend nach Punkten (Gleichstand: alphabetisch). */
+export function buildLeaderboard(entries: LeaderboardEntry[], matches: Match[], currentPlayerId?: number): Player[] {
+  return entries
+    .map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      points: totalPoints(entry.tips, matches),
+      isCurrentUser: entry.id === currentPlayerId,
+    }))
+    .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name, "de"))
+}
+
+export function rankOf(players: Player[], playerId: number): number {
+  return players.findIndex((p) => p.id === playerId) + 1
 }

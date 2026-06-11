@@ -35,3 +35,5 @@ storybook-static/
 
 /.npm-only-allow
 .pnpm-store/
+# SQLite-Datenbank (Spieler, Sessions, Tipps)
+/.data/
