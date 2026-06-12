@@ -9,6 +9,14 @@ import { useLive, useMatches } from "lib/hooks"
 import { pointsForTip } from "lib/scoring"
 import type { LiveScore, Match, PlayerAccount, Score, Tips } from "lib/types"
 
+/** Wie nah der Tipp am Resultat war (Punktesystem 3/2/1/0). */
+const POINTS_LABEL: Record<number, string> = {
+  3: "exakt",
+  2: "Tordifferenz",
+  1: "Tendenz",
+  0: "daneben",
+}
+
 export default function TippsPage() {
   const [player, setPlayer] = useState<PlayerAccount | null>(null)
   const [tips, setTips] = useState<Tips | null>(null)
@@ -146,8 +154,21 @@ function MatchTipRow({
     live && live.home !== null && live.away !== null ? { home: live.home, away: live.away } : null
   const liveEarned = !finished && liveScore && tip ? pointsForTip(tip, liveScore) : null
 
+  // beendete Spiele werden nach Tipp-Erfolg eingefärbt
+  const cardTone = !finished
+    ? "border-gray-800 bg-gray-900/80"
+    : earned === 3
+      ? "border-emerald-500/70 bg-emerald-950/50"
+      : earned === 2
+        ? "border-emerald-700/60 bg-emerald-950/30"
+        : earned === 1
+          ? "border-amber-600/50 bg-amber-950/25"
+          : earned === 0
+            ? "border-red-900/70 bg-red-950/20"
+            : "border-gray-700 bg-gray-800/40" // beendet, aber kein Tipp abgegeben
+
   return (
-    <li className="rounded-2xl border border-gray-800 bg-gray-900/80 p-4">
+    <li className={`rounded-2xl border p-4 ${cardTone}`}>
       <div className="mb-3 flex items-center justify-between gap-2 text-xs">
         <span className="font-semibold text-emerald-300">
           {match.group ? `Gruppe ${match.group}` : `Spiel ${match.id}`}
@@ -174,32 +195,41 @@ function MatchTipRow({
           </span>
         </div>
 
-        {/* Eingabe / Resultat */}
-        <div className="flex shrink-0 items-center gap-1.5">
-          <input
-            type="number"
-            inputMode="numeric"
-            min={0}
-            max={20}
-            aria-label={`Tore ${match.home.name}`}
-            disabled={locked || !tips}
-            value={tip?.home ?? ""}
-            onChange={(e) => onTip(match.id, "home", e.target.value)}
-            className="h-11 w-12 rounded-lg border border-gray-700 bg-gray-950 text-center text-lg font-bold text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none disabled:opacity-50"
-          />
-          <span className="text-gray-500">:</span>
-          <input
-            type="number"
-            inputMode="numeric"
-            min={0}
-            max={20}
-            aria-label={`Tore ${match.away.name}`}
-            disabled={locked || !tips}
-            value={tip?.away ?? ""}
-            onChange={(e) => onTip(match.id, "away", e.target.value)}
-            className="h-11 w-12 rounded-lg border border-gray-700 bg-gray-950 text-center text-lg font-bold text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none disabled:opacity-50"
-          />
-        </div>
+        {/* Eingabe bzw. Endstand */}
+        {finished && match.result ? (
+          <div className="shrink-0 text-center">
+            <span className="text-2xl font-extrabold text-white tabular-nums">
+              {match.result.home}:{match.result.away}
+            </span>
+            <span className="block text-[10px] tracking-widest text-gray-400 uppercase">Endstand</span>
+          </div>
+        ) : (
+          <div className="flex shrink-0 items-center gap-1.5">
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={20}
+              aria-label={`Tore ${match.home.name}`}
+              disabled={locked || !tips}
+              value={tip?.home ?? ""}
+              onChange={(e) => onTip(match.id, "home", e.target.value)}
+              className="h-11 w-12 rounded-lg border border-gray-700 bg-gray-950 text-center text-lg font-bold text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none disabled:opacity-50"
+            />
+            <span className="text-gray-500">:</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={20}
+              aria-label={`Tore ${match.away.name}`}
+              disabled={locked || !tips}
+              value={tip?.away ?? ""}
+              onChange={(e) => onTip(match.id, "away", e.target.value)}
+              className="h-11 w-12 rounded-lg border border-gray-700 bg-gray-950 text-center text-lg font-bold text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none disabled:opacity-50"
+            />
+          </div>
+        )}
 
         {/* Auswärts */}
         <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -211,23 +241,31 @@ function MatchTipRow({
         </div>
       </div>
 
-      {finished && match.result && (
-        <p className="mt-2 text-center text-xs text-gray-400">
-          Endstand{" "}
-          <span className="font-bold text-white">
-            {match.result.home}:{match.result.away}
-          </span>
-          {earned !== null && (
+      {finished &&
+        match.result &&
+        (tip && earned !== null ? (
+          <p className="mt-2.5 flex items-center justify-center gap-2 text-center text-xs text-gray-300">
+            Dein Tipp{" "}
+            <span className="font-bold text-white tabular-nums">
+              {tip.home}:{tip.away}
+            </span>
             <span
-              className={`ml-2 rounded-full px-2 py-0.5 font-bold ${
-                earned > 0 ? "bg-emerald-700 text-white" : "bg-gray-800 text-gray-400"
+              className={`rounded-full px-2 py-0.5 font-bold ${
+                earned === 3
+                  ? "bg-emerald-500 text-emerald-950"
+                  : earned === 2
+                    ? "bg-emerald-700 text-white"
+                    : earned === 1
+                      ? "bg-amber-600 text-amber-950"
+                      : "bg-red-900/80 text-red-200"
               }`}
             >
-              +{earned} P
+              +{earned} P · {POINTS_LABEL[earned]}
             </span>
-          )}
-        </p>
-      )}
+          </p>
+        ) : (
+          <p className="mt-2.5 text-center text-xs text-gray-500">Kein Tipp abgegeben — 0 P</p>
+        ))}
 
       {!finished && liveScore && (
         <p className="mt-2 text-center text-xs text-gray-400">
