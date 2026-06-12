@@ -1,21 +1,26 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { fetchLive, fetchMatches } from "./api"
 import { MATCHES } from "./data"
 import type { LiveSnapshot, Match } from "./types"
 
-/** Statischer Spielplan als Startwert, ersetzt durch den Server-Stand (Resultate, Verschiebungen). */
-export function useMatches(): Match[] {
+/**
+ * Statischer Spielplan als Startwert, ersetzt durch den Server-Stand
+ * (Resultate, Verschiebungen); refresh() lädt neu (z.B. nach dem Sync-Button).
+ */
+export function useMatches(): { matches: Match[]; refresh: () => Promise<void> } {
   const [matches, setMatches] = useState<Match[]>(MATCHES)
-  useEffect(() => {
-    void fetchMatches().then((fresh) => {
-      if (fresh) {
-        setMatches(fresh)
-      }
-    })
+  const refresh = useCallback(async () => {
+    const fresh = await fetchMatches()
+    if (fresh) {
+      setMatches(fresh)
+    }
   }, [])
-  return matches
+  useEffect(() => {
+    void refresh()
+  }, [refresh])
+  return { matches, refresh }
 }
 
 const LIVE_POLL_MS = 60_000

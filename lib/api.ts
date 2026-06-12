@@ -1,3 +1,4 @@
+import type { ImportStats } from "./feed/import"
 import type { LiveSnapshot, Match, Player, PlayerAccount, Score, Tips } from "./types"
 
 /** Client-Helfer für die API-Routen. Fehler kommen als { error } mit Nicht-2xx-Status. */
@@ -90,6 +91,15 @@ export async function fetchLive(): Promise<LiveSnapshot | null> {
     return null
   }
   return (await response.json()) as LiveSnapshot
+}
+
+/** Ad-hoc-Abgleich mit dem Resultat-Feed (Sync-Button). */
+export async function syncResults(): Promise<{ stats?: ImportStats; throttled?: boolean; error?: string }> {
+  const response = await fetch("/api/sync", { method: "POST" })
+  if (!response.ok) {
+    return { error: await readError(response) }
+  }
+  return (await response.json()) as { stats?: ImportStats; throttled?: boolean }
 }
 
 /** Tipps aller Mitspielenden zu einem Spiel (erst nach Anstoss freigegeben). */

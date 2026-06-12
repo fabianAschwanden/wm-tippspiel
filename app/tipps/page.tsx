@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { ScoringRules } from "components/ScoringRules/ScoringRules"
-import { fetchMatchTips, fetchMe, fetchTips, saveTip } from "lib/api"
+import { fetchMatchTips, fetchMe, fetchTips, saveTip, syncResults } from "lib/api"
 import { dayKey, dayLabel, timeLabel } from "lib/dates"
 import { useLive, useMatches } from "lib/hooks"
 import { pointsForTip } from "lib/scoring"
@@ -22,8 +22,10 @@ export default function TippsPage() {
   const [tips, setTips] = useState<Tips | null>(null)
   const [now, setNow] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const matches = useMatches()
+  const { matches, refresh } = useMatches()
   const live = useLive()
+  const [syncing, setSyncing] = useState(false)
+  const [syncMessage, setSyncMessage] = useState<string | null>(null)
 
   useEffect(() => {
     setNow(Date.now())
@@ -74,6 +76,24 @@ export default function TippsPage() {
   // Tipps sind bis zum Anstoss möglich; vorher gerendert = gesperrt (kein Hydration-Mismatch)
   const isStarted = (match: Match) => now === null || new Date(match.kickoff).getTime() <= now
 
+  const doSync = async () => {
+    setSyncing(true)
+    setSyncMessage(null)
+    const result = await syncResults()
+    setSyncing(false)
+    if (result.error) {
+      setSyncMessage(result.error)
+      return
+    }
+    if (result.throttled) {
+      setSyncMessage("Gerade erst abgeglichen — bitte einen Moment warten.")
+      return
+    }
+    const fresh = result.stats?.results ?? 0
+    setSyncMessage(fresh === 1 ? "1 neuer Endstand übernommen." : `${fresh} neue Endstände übernommen.`)
+    await refresh()
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between gap-4">
@@ -81,8 +101,30 @@ export default function TippsPage() {
           <h1 className="text-2xl font-extrabold">Tipp-Abgabe</h1>
           <p className="mt-1 text-sm text-gray-400">Tipps werden automatisch gespeichert — bis zum Anstoss.</p>
         </div>
-        <ScoringRules />
+        <div className="flex shrink-0 items-center gap-2">
+          {player && (
+            <button
+              type="button"
+              onClick={() => void doSync()}
+              disabled={syncing}
+              title="Resultate jetzt mit dem Datenfeed abgleichen"
+              className="flex items-center gap-1.5 rounded-full border border-emerald-700 px-4 py-1.5 text-sm font-medium text-emerald-300 transition-colors hover:bg-emerald-900/60 disabled:opacity-50"
+            >
+              <span className={syncing ? "animate-spin" : undefined} aria-hidden>
+                ↻
+              </span>
+              <span className="hidden sm:inline">{syncing ? "Gleicht ab …" : "Resultate abgleichen"}</span>
+            </button>
+          )}
+          <ScoringRules />
+        </div>
       </div>
+
+      {syncMessage && (
+        <p role="status" className="rounded-2xl border border-gray-800 bg-gray-900/80 px-4 py-3 text-sm text-gray-300">
+          {syncMessage}
+        </p>
+      )}
 
       {player === null && tips !== null && (
         <p className="rounded-2xl border border-amber-700/60 bg-amber-950/40 px-4 py-3 text-sm text-amber-200">

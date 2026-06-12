@@ -16,7 +16,7 @@ export default function Dashboard() {
   const [tips, setTips] = useState<Tips>({})
   const [loaded, setLoaded] = useState(false)
   const [now, setNow] = useState<number | null>(null)
-  const matches = useMatches()
+  const { matches } = useMatches()
   const live = useLive()
 
   useEffect(() => {
