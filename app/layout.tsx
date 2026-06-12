@@ -19,7 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="de">
       <body className="min-h-screen bg-gray-950 bg-[radial-gradient(ellipse_at_top,rgba(16,88,48,0.35),transparent_60%)] text-white antialiased">
         <header className="sticky top-0 z-30 border-b border-emerald-900/60 bg-gray-950/90 backdrop-blur">
-          <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-3">
+          <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-x-4 gap-y-1.5 px-4 py-3">
             <Link href="/" className="flex items-center gap-2 text-lg font-extrabold tracking-tight">
               <span aria-hidden>⚽</span>
               <span>

@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
+import { ScoreStepper } from "components/ScoreStepper/ScoreStepper"
 import { ScoringRules } from "components/ScoringRules/ScoringRules"
 import { fetchMatchTips, fetchMe, fetchTips, saveTip, syncResults } from "lib/api"
 import { dayKey, dayLabel, timeLabel } from "lib/dates"
@@ -56,12 +57,10 @@ export default function TippsPage() {
 
   const liveByMatch = useMemo(() => new Map((live?.scores ?? []).map((s) => [s.matchId, s])), [live])
 
-  const setTip = (matchId: number, side: "home" | "away", value: string) => {
+  const setTip = (matchId: number, side: "home" | "away", goals: number) => {
     if (!tips || !player) {
       return
     }
-    const parsed = Number.parseInt(value, 10)
-    const goals = Number.isNaN(parsed) ? 0 : Math.max(0, Math.min(20, parsed))
     const tip = { home: 0, away: 0, ...tips[matchId], [side]: goals }
     setTips({ ...tips, [matchId]: tip })
     setError(null)
@@ -187,7 +186,7 @@ function MatchTipRow({
   locked: boolean
   live: LiveScore | undefined
   canReveal: boolean
-  onTip: (matchId: number, side: "home" | "away", value: string) => void
+  onTip: (matchId: number, side: "home" | "away", goals: number) => void
 }) {
   const tip = tips?.[match.id]
   const finished = Boolean(match.result)
@@ -227,11 +226,11 @@ function MatchTipRow({
           {match.venue ? ` · ${match.venue}` : ""}
         </span>
       </div>
-      <div className="flex items-center justify-between gap-2">
+      {/* Mobil: Teams in einer Zeile, Tipp-Eingabe darunter; ab sm alles in einer Zeile */}
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-3">
         {/* Heim */}
-        <div className="flex min-w-0 flex-1 items-center justify-end gap-2 text-right">
-          <span className="hidden truncate font-semibold sm:block">{match.home.name}</span>
-          <span className="font-semibold sm:hidden">{match.home.code}</span>
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-2 text-right" title={match.home.name}>
+          <span className="truncate font-semibold">{match.home.name}</span>
           <span className="text-2xl" aria-hidden>
             {match.home.flag}
           </span>
@@ -246,40 +245,32 @@ function MatchTipRow({
             <span className="block text-[10px] tracking-widest text-gray-400 uppercase">Endstand</span>
           </div>
         ) : (
-          <div className="flex shrink-0 items-center gap-1.5">
-            <input
-              type="number"
-              inputMode="numeric"
-              min={0}
-              max={20}
-              aria-label={`Tore ${match.home.name}`}
-              disabled={locked || !tips}
-              value={tip?.home ?? ""}
-              onChange={(e) => onTip(match.id, "home", e.target.value)}
-              className="h-11 w-12 rounded-lg border border-gray-700 bg-gray-950 text-center text-lg font-bold text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none disabled:opacity-50"
-            />
-            <span className="text-gray-500">:</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              min={0}
-              max={20}
-              aria-label={`Tore ${match.away.name}`}
-              disabled={locked || !tips}
-              value={tip?.away ?? ""}
-              onChange={(e) => onTip(match.id, "away", e.target.value)}
-              className="h-11 w-12 rounded-lg border border-gray-700 bg-gray-950 text-center text-lg font-bold text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none disabled:opacity-50"
-            />
-          </div>
+          <>
+            <span className="shrink-0 text-sm text-gray-600 sm:hidden">vs</span>
+            <div className="order-last flex w-full items-center justify-center gap-2 sm:order-none sm:w-auto">
+              <ScoreStepper
+                value={tip?.home ?? null}
+                ariaLabel={`Tore ${match.home.name}`}
+                disabled={locked || !tips}
+                onChange={(goals) => onTip(match.id, "home", goals)}
+              />
+              <span className="text-gray-500">:</span>
+              <ScoreStepper
+                value={tip?.away ?? null}
+                ariaLabel={`Tore ${match.away.name}`}
+                disabled={locked || !tips}
+                onChange={(goals) => onTip(match.id, "away", goals)}
+              />
+            </div>
+          </>
         )}
 
         {/* Auswärts */}
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2" title={match.away.name}>
           <span className="text-2xl" aria-hidden>
             {match.away.flag}
           </span>
-          <span className="hidden truncate font-semibold sm:block">{match.away.name}</span>
-          <span className="font-semibold sm:hidden">{match.away.code}</span>
+          <span className="truncate font-semibold">{match.away.name}</span>
         </div>
       </div>
 

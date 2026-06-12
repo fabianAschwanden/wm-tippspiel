@@ -112,22 +112,26 @@ export default function Dashboard() {
               return (
                 <li
                   key={match.id}
-                  className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-800/60 bg-gray-900/80 p-4"
+                  className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-2xl border border-emerald-800/60 bg-gray-900/80 p-4"
                 >
                   <div className="flex min-w-0 items-center gap-3">
-                    <span className="text-2xl" aria-hidden>
+                    <span className="text-2xl" title={match.home.name} aria-hidden>
                       {match.home.flag}
                     </span>
-                    <span className="truncate font-semibold">{match.home.name}</span>
+                    <span className="truncate font-semibold" title={match.home.name}>
+                      {match.home.name}
+                    </span>
                     <span className="text-xl font-extrabold text-white tabular-nums">
                       {liveScore ? `${liveScore.home}:${liveScore.away}` : "–:–"}
                     </span>
-                    <span className="truncate font-semibold">{match.away.name}</span>
-                    <span className="text-2xl" aria-hidden>
+                    <span className="truncate font-semibold" title={match.away.name}>
+                      {match.away.name}
+                    </span>
+                    <span className="text-2xl" title={match.away.name} aria-hidden>
                       {match.away.flag}
                     </span>
                   </div>
-                  <div className="shrink-0 text-right text-xs">
+                  <div className="ml-auto shrink-0 text-right text-xs">
                     <p className="inline-flex items-center gap-1.5 rounded-full bg-emerald-900/80 px-2 py-0.5 font-bold text-emerald-300">
                       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" aria-hidden />
                       {score.status === "PAUSED" ? "Pause" : "LIVE"}
@@ -164,20 +168,24 @@ export default function Dashboard() {
           {upcoming.map((match) => (
             <li
               key={match.id}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-gray-800 bg-gray-900/80 p-4"
+              className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-2xl border border-gray-800 bg-gray-900/80 p-4"
             >
               <div className="flex min-w-0 items-center gap-3">
-                <span className="text-2xl" aria-hidden>
+                <span className="text-2xl" title={match.home.name} aria-hidden>
                   {match.home.flag}
                 </span>
-                <span className="truncate font-semibold">{match.home.name}</span>
+                <span className="truncate font-semibold" title={match.home.name}>
+                  {match.home.name}
+                </span>
                 <span className="text-gray-500">vs</span>
-                <span className="truncate font-semibold">{match.away.name}</span>
-                <span className="text-2xl" aria-hidden>
+                <span className="truncate font-semibold" title={match.away.name}>
+                  {match.away.name}
+                </span>
+                <span className="text-2xl" title={match.away.name} aria-hidden>
                   {match.away.flag}
                 </span>
               </div>
-              <div className="shrink-0 text-right text-xs text-gray-400">
+              <div className="ml-auto shrink-0 text-right text-xs text-gray-400">
                 <p className="font-medium text-emerald-300">
                   {match.stage === "Gruppenphase" ? `Gruppe ${match.group}` : match.stage}
                 </p>
