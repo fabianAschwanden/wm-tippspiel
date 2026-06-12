@@ -19,16 +19,36 @@ describe("buildLeaderboard", () => {
   it("sortiert nach Punkten und markiert die aktuelle Spielerin", () => {
     const players = buildLeaderboard(
       [
-        { id: 1, name: "Anna", tips: { 1: { home: 1, away: 0 } } }, // Tendenz + Differenz -> 2 Punkte
-        { id: 2, name: "Marco", tips: { 1: { home: 2, away: 1 } } }, // exakt -> 3 Punkte
-        { id: 3, name: "Lena", tips: {} },
+        { id: 1, name: "Anna", tips: { 1: { home: 1, away: 0 } }, bonus: {} }, // Tendenz + Differenz -> 8
+        { id: 2, name: "Marco", tips: { 1: { home: 2, away: 1 } }, bonus: {} }, // exakt -> 10
+        { id: 3, name: "Lena", tips: {}, bonus: {} },
       ],
       matches,
       1
     )
     expect(players.map((p) => p.name)).toEqual(["Marco", "Anna", "Lena"])
-    expect(players.map((p) => p.points)).toEqual([3, 2, 0])
+    expect(players.map((p) => p.points)).toEqual([10, 8, 0])
     expect(players.find((p) => p.isCurrentUser)?.name).toBe("Anna")
+  })
+
+  it("zählt Zusatzfragen-Punkte, sobald die Antworten feststehen", () => {
+    const finalMatch: Match = {
+      id: 104,
+      stage: "Final",
+      kickoff: "2026-07-19T19:00:00Z",
+      home: team("SUI"),
+      away: team("BRA"),
+      result: { home: 2, away: 1 },
+    }
+    const players = buildLeaderboard(
+      [
+        { id: 1, name: "Anna", tips: {}, bonus: { weltmeister: "SUI", vize: "BRA" } }, // 50 + 20
+        { id: 2, name: "Marco", tips: {}, bonus: { weltmeister: "BRA" } }, // 0
+      ],
+      [finalMatch]
+    )
+    expect(players.map((p) => p.name)).toEqual(["Anna", "Marco"])
+    expect(players.map((p) => p.points)).toEqual([70, 0])
   })
 
   it("bricht Punktgleichstand mit der Anzahl exakter Tipps, danach alphabetisch", () => {
@@ -45,20 +65,21 @@ describe("buildLeaderboard", () => {
     ]
     const players = buildLeaderboard(
       [
-        { id: 1, name: "Zoe", tips: { 1: { home: 2, away: 1 } } }, // exakt -> 3 P, 1 exakt
-        { id: 2, name: "Ben", tips: { 1: { home: 3, away: 2 }, 3: { home: 2, away: 0 } } }, // 2 P + 1 P -> 3 P, 0 exakt
+        { id: 1, name: "Zoe", tips: { 1: { home: 2, away: 1 } }, bonus: {} }, // exakt -> 10 P, 1 exakt
+        // zweimal blosse Tendenz -> 5 + 5 = 10 P, 0 exakt
+        { id: 2, name: "Ben", tips: { 1: { home: 4, away: 0 }, 3: { home: 3, away: 1 } }, bonus: {} },
       ],
       twoMatches
     )
-    expect(players.map((p) => p.points)).toEqual([3, 3])
+    expect(players.map((p) => p.points)).toEqual([10, 10])
     expect(players.map((p) => p.name)).toEqual(["Zoe", "Ben"])
   })
 
   it("bricht völligen Gleichstand alphabetisch", () => {
     const players = buildLeaderboard(
       [
-        { id: 1, name: "Zoe", tips: {} },
-        { id: 2, name: "Ben", tips: {} },
+        { id: 1, name: "Zoe", tips: {}, bonus: {} },
+        { id: 2, name: "Ben", tips: {}, bonus: {} },
       ],
       matches
     )
@@ -70,8 +91,8 @@ describe("rankOf", () => {
   it("liefert den 1-basierten Rang per Spieler-ID", () => {
     const players = buildLeaderboard(
       [
-        { id: 7, name: "Anna", tips: { 1: { home: 2, away: 1 } } },
-        { id: 8, name: "Ben", tips: {} },
+        { id: 7, name: "Anna", tips: { 1: { home: 2, away: 1 } }, bonus: {} },
+        { id: 8, name: "Ben", tips: {}, bonus: {} },
       ],
       matches
     )

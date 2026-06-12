@@ -108,7 +108,7 @@ export default function Dashboard() {
               const tip = tips[match.id]
               const liveScore =
                 score.home !== null && score.away !== null ? { home: score.home, away: score.away } : null
-              const liveEarned = tip && liveScore ? pointsForTip(tip, liveScore) : null
+              const liveEarned = tip && liveScore ? pointsForTip(tip, liveScore, match.stage) : null
               return (
                 <li
                   key={match.id}

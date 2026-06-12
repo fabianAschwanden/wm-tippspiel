@@ -2,6 +2,7 @@
 import { beforeAll, describe, expect, it } from "vitest"
 import {
   allPlayersWithTips,
+  bonusTipsForPlayer,
   consumeAuthToken,
   createAuthToken,
   createSession,
@@ -13,6 +14,7 @@ import {
   registerPlayer,
   setPassword,
   tipsForPlayer,
+  upsertBonusTip,
   upsertTip,
 } from "./db"
 
@@ -44,6 +46,18 @@ describe("sessions", () => {
 
   it("kennt unbekannte Tokens nicht", async () => {
     expect(await playerBySession("gibtsnicht")).toBeNull()
+  })
+})
+
+describe("bonus-tips", () => {
+  it("legt Zusatzfragen-Tipps an, überschreibt sie und liefert sie in der Ranglisten-Abfrage", async () => {
+    const player = (await registerPlayer("Bonus", "bonus@example.com"))!
+    await upsertBonusTip(player.id, "weltmeister", "BRA")
+    await upsertBonusTip(player.id, "weltmeister", "SUI")
+    await upsertBonusTip(player.id, "vize", "GER")
+    expect(await bonusTipsForPlayer(player.id)).toEqual({ weltmeister: "SUI", vize: "GER" })
+    const everyone = await allPlayersWithTips()
+    expect(everyone.find((p) => p.id === player.id)?.bonus).toEqual({ weltmeister: "SUI", vize: "GER" })
   })
 })
 

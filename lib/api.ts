@@ -1,3 +1,4 @@
+import type { BonusTips } from "./bonus"
 import type { ImportStats } from "./feed/import"
 import type { LiveSnapshot, Match, Player, PlayerAccount, Score, Tips } from "./types"
 
@@ -120,6 +121,28 @@ export async function fetchLive(): Promise<LiveSnapshot | null> {
     return null
   }
   return (await response.json()) as LiveSnapshot
+}
+
+/** Eigene Zusatzfragen-Tipps (Weltmeister etc.). */
+export async function fetchBonus(): Promise<BonusTips> {
+  const response = await fetch("/api/bonus")
+  if (!response.ok) {
+    return {}
+  }
+  const body = (await response.json()) as { bonus: BonusTips }
+  return body.bonus
+}
+
+export async function saveBonusTip(questionId: string, team: string): Promise<{ error?: string }> {
+  const response = await fetch("/api/bonus", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ questionId, team }),
+  })
+  if (!response.ok) {
+    return { error: await readError(response) }
+  }
+  return {}
 }
 
 /** Ad-hoc-Abgleich mit dem Resultat-Feed (Sync-Button). */

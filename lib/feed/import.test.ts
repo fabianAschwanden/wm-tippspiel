@@ -86,7 +86,7 @@ describe("importFeedMatches", () => {
     await upsertTip(player.id, 1, { home: 2, away: 1 }) // exakt zum korrigierten Endstand
     const players = buildLeaderboard(await allPlayersWithTips(), await currentMatches(), player.id)
     const me = players.find((p) => p.isCurrentUser)
-    expect(me?.points).toBe(3)
+    expect(me?.points).toBe(10) // exakter Gruppentipp = 5+1+1+3
     expect(me?.exact).toBe(1)
   })
 })

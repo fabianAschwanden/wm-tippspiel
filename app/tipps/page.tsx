@@ -4,18 +4,30 @@ import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { ScoreStepper } from "components/ScoreStepper/ScoreStepper"
 import { ScoringRules } from "components/ScoringRules/ScoringRules"
-import { fetchMatchTips, fetchMe, fetchTips, saveTip, syncResults } from "lib/api"
+import { fetchBonus, fetchMatchTips, fetchMe, fetchTips, saveBonusTip, saveTip, syncResults } from "lib/api"
+import { BONUS_QUESTIONS, bonusAnswers, bonusDeadline, type BonusTips } from "lib/bonus"
+import { TEAMS } from "lib/data"
 import { dayKey, dayLabel, timeLabel } from "lib/dates"
 import { useLive, useMatches } from "lib/hooks"
-import { pointsForTip } from "lib/scoring"
-import type { LiveScore, Match, PlayerAccount, Score, Tips } from "lib/types"
+import { maxPointsFor, pointsForTip, stageFactor } from "lib/scoring"
+import type { LiveScore, Match, PlayerAccount, Score, Stage, Team, Tips } from "lib/types"
 
-/** Wie nah der Tipp am Resultat war (Punktesystem 3/2/1/0). */
-const POINTS_LABEL: Record<number, string> = {
-  3: "exakt",
-  2: "Tordifferenz",
-  1: "Tendenz",
-  0: "daneben",
+/** Wie nah der Tipp am Resultat war (additives Punktesystem, K.o. doppelt). */
+function pointsLabel(earned: number, stage: Stage): string {
+  const factor = stageFactor(stage)
+  if (earned === maxPointsFor(stage)) {
+    return "exakt"
+  }
+  if (earned >= 8 * factor) {
+    return "Tendenz + Differenz"
+  }
+  if (earned >= 5 * factor) {
+    return "Tendenz"
+  }
+  if (earned > 0) {
+    return "Torzahl"
+  }
+  return "daneben"
 }
 
 export default function TippsPage() {
@@ -141,6 +153,8 @@ export default function TippsPage() {
         </p>
       )}
 
+      <BonusSection player={player} matches={matches} now={now} />
+
       {matchDays.map(({ key, matches: dayMatches }) => {
         const first = dayMatches[0]
         if (!first) {
@@ -173,6 +187,121 @@ export default function TippsPage() {
   )
 }
 
+/** Zusatzfragen (Weltmeister etc.): Team-Auswahl, änderbar bis zum Start der K.o.-Runde. */
+function BonusSection({
+  player,
+  matches,
+  now,
+}: {
+  player: PlayerAccount | null
+  matches: Match[]
+  now: number | null
+}) {
+  const [bonus, setBonus] = useState<BonusTips | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (player) {
+      void fetchBonus().then(setBonus)
+    } else {
+      setBonus({})
+    }
+  }, [player])
+
+  const deadline = bonusDeadline(matches)
+  const locked = !player || now === null || new Date(deadline).getTime() <= now
+  const answers = bonusAnswers(matches)
+  const teams = useMemo(
+    () => Object.values(TEAMS as Record<string, Team>).sort((a, b) => a.name.localeCompare(b.name, "de")),
+    []
+  )
+  const teamName = (code: string | undefined) =>
+    code ? ((TEAMS as Record<string, Team>)[code]?.name ?? code) : undefined
+
+  const pick = (questionId: string, team: string) => {
+    if (!bonus || !team) {
+      return
+    }
+    setBonus({ ...bonus, [questionId]: team })
+    setError(null)
+    void saveBonusTip(questionId, team).then((result) => {
+      if (result.error) {
+        setError(result.error)
+        void fetchBonus().then(setBonus)
+      }
+    })
+  }
+
+  return (
+    <section>
+      <h2 className="mb-3 rounded-xl border border-gray-800 bg-gray-800/60 px-4 py-2.5 text-sm font-bold text-white">
+        Zusatzfragen <span className="text-gray-500">·</span>{" "}
+        <span className="text-emerald-300">
+          änderbar bis {dayLabel(deadline, now)}, {timeLabel(deadline)}
+        </span>
+      </h2>
+      {error && (
+        <p
+          role="alert"
+          className="mb-3 rounded-2xl border border-red-800/60 bg-red-950/40 px-4 py-3 text-sm text-red-300"
+        >
+          {error}
+        </p>
+      )}
+      <ul className="space-y-3">
+        {BONUS_QUESTIONS.map((q) => {
+          const answer = answers[q.id]
+          const tip = bonus?.[q.id]
+          const resolved = Boolean(answer)
+          const correct = resolved && tip === answer
+          return (
+            <li
+              key={q.id}
+              className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-2xl border p-4 ${
+                resolved
+                  ? correct
+                    ? "border-emerald-500/70 bg-emerald-950/50"
+                    : "border-red-900/70 bg-red-950/20"
+                  : "border-gray-800 bg-gray-900/80"
+              }`}
+            >
+              <div className="min-w-0">
+                <p className="font-semibold">{q.question}</p>
+                <p className="text-xs text-emerald-300">{q.points} Punkte</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {resolved && (
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                      correct ? "bg-emerald-500 text-emerald-950" : "bg-red-900/80 text-red-200"
+                    }`}
+                  >
+                    {correct ? `+${q.points} P` : `${teamName(answer)}`}
+                  </span>
+                )}
+                <select
+                  aria-label={q.question}
+                  disabled={locked || !bonus}
+                  value={tip ?? ""}
+                  onChange={(e) => pick(q.id, e.target.value)}
+                  className="h-11 max-w-44 rounded-lg border border-gray-700 bg-gray-950 px-2 font-semibold text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none disabled:opacity-50"
+                >
+                  <option value="">– wählen –</option>
+                  {teams.map((team) => (
+                    <option key={team.code} value={team.code}>
+                      {team.flag} {team.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+    </section>
+  )
+}
+
 function MatchTipRow({
   match,
   tips,
@@ -190,23 +319,24 @@ function MatchTipRow({
 }) {
   const tip = tips?.[match.id]
   const finished = Boolean(match.result)
-  const earned = finished && tip && match.result ? pointsForTip(tip, match.result) : null
+  const earned = finished && tip && match.result ? pointsForTip(tip, match.result, match.stage) : null
   const liveScore: Score | null =
     live && live.home !== null && live.away !== null ? { home: live.home, away: live.away } : null
-  const liveEarned = !finished && liveScore && tip ? pointsForTip(tip, liveScore) : null
+  const liveEarned = !finished && liveScore && tip ? pointsForTip(tip, liveScore, match.stage) : null
 
   // beendete Spiele werden nach Tipp-Erfolg eingefärbt
+  const factor = stageFactor(match.stage)
   const cardTone = !finished
     ? "border-gray-800 bg-gray-900/80"
-    : earned === 3
-      ? "border-emerald-500/70 bg-emerald-950/50"
-      : earned === 2
-        ? "border-emerald-700/60 bg-emerald-950/30"
-        : earned === 1
-          ? "border-amber-600/50 bg-amber-950/25"
-          : earned === 0
-            ? "border-red-900/70 bg-red-950/20"
-            : "border-gray-700 bg-gray-800/40" // beendet, aber kein Tipp abgegeben
+    : earned === null
+      ? "border-gray-700 bg-gray-800/40" // beendet, aber kein Tipp abgegeben
+      : earned === maxPointsFor(match.stage)
+        ? "border-emerald-500/70 bg-emerald-950/50"
+        : earned >= 5 * factor
+          ? "border-emerald-700/60 bg-emerald-950/30"
+          : earned > 0
+            ? "border-amber-600/50 bg-amber-950/25"
+            : "border-red-900/70 bg-red-950/20"
 
   return (
     <li className={`rounded-2xl border p-4 ${cardTone}`}>
@@ -284,16 +414,16 @@ function MatchTipRow({
             </span>
             <span
               className={`rounded-full px-2 py-0.5 font-bold ${
-                earned === 3
+                earned === maxPointsFor(match.stage)
                   ? "bg-emerald-500 text-emerald-950"
-                  : earned === 2
+                  : earned >= 5 * factor
                     ? "bg-emerald-700 text-white"
-                    : earned === 1
+                    : earned > 0
                       ? "bg-amber-600 text-amber-950"
                       : "bg-red-900/80 text-red-200"
               }`}
             >
-              +{earned} P · {POINTS_LABEL[earned]}
+              +{earned} P · {pointsLabel(earned, match.stage)}
             </span>
           </p>
         ) : (

@@ -2,12 +2,14 @@ import { randomBytes } from "node:crypto"
 import { mkdirSync } from "node:fs"
 import path from "node:path"
 import { env } from "env.mjs"
+import type { BonusTips } from "../bonus"
 import type { PlayerAccount, Score, Tips } from "../types"
 
 export interface PlayerTips {
   id: number
   name: string
   tips: Tips
+  bonus: BonusTips
 }
 
 /** Minimaler gemeinsamer Nenner von @neondatabase/serverless (Pool) und PGlite. */
@@ -59,6 +61,14 @@ const SCHEMA = [
     player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
     purpose TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`,
+  // Zusatzfragen-Tipps (Team-Code je Frage, lib/bonus.ts)
+  `CREATE TABLE IF NOT EXISTS bonus_tips (
+    player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    question_id TEXT NOT NULL,
+    team TEXT NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (player_id, question_id)
   )`,
 ]
 
@@ -229,7 +239,7 @@ export async function upsertTip(playerId: number, matchId: number, score: Score)
   )
 }
 
-/** Alle Spieler:innen mit ihren Tipps, für die Rangliste. */
+/** Alle Spieler:innen mit ihren Tipps und Zusatzfragen-Tipps, für die Rangliste. */
 export async function allPlayersWithTips(): Promise<PlayerTips[]> {
   const db = await getDb()
   const { rows } = await db.query<{
@@ -245,13 +255,45 @@ export async function allPlayersWithTips(): Promise<PlayerTips[]> {
   )
   const players = new Map<number, PlayerTips>()
   for (const row of rows) {
-    const player = players.get(row.id) ?? { id: row.id, name: row.name, tips: {} }
+    const player = players.get(row.id) ?? { id: row.id, name: row.name, tips: {}, bonus: {} }
     if (row.match_id !== null && row.home !== null && row.away !== null) {
       player.tips[row.match_id] = { home: row.home, away: row.away }
     }
     players.set(row.id, player)
   }
+  const bonusRows = await db.query<{ player_id: number; question_id: string; team: string }>(
+    "SELECT player_id, question_id, team FROM bonus_tips"
+  )
+  for (const row of bonusRows.rows) {
+    const player = players.get(row.player_id)
+    if (player) {
+      player.bonus[row.question_id] = row.team
+    }
+  }
   return Array.from(players.values())
+}
+
+export async function bonusTipsForPlayer(playerId: number): Promise<BonusTips> {
+  const db = await getDb()
+  const { rows } = await db.query<{ question_id: string; team: string }>(
+    "SELECT question_id, team FROM bonus_tips WHERE player_id = $1",
+    [playerId]
+  )
+  const bonus: BonusTips = {}
+  for (const row of rows) {
+    bonus[row.question_id] = row.team
+  }
+  return bonus
+}
+
+export async function upsertBonusTip(playerId: number, questionId: string, team: string): Promise<void> {
+  const db = await getDb()
+  await db.query(
+    `INSERT INTO bonus_tips (player_id, question_id, team) VALUES ($1, $2, $3)
+     ON CONFLICT (player_id, question_id)
+     DO UPDATE SET team = excluded.team, updated_at = now()`,
+    [playerId, questionId, team]
+  )
 }
 
 /** Alle Tipps zu einem Spiel (Einsicht erst nach Anstoss, prüft der Aufrufer). */

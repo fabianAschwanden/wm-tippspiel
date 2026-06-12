@@ -1,7 +1,7 @@
 # wm-tippspiel
 
 Demo-App aus dem website-template (Next.js App Router, TS strict, Tailwind 4).
-Fachlogik: lib/scoring.ts (Punkte), lib/data.ts (offizieller WM-2026-Spielplan: 104 Spiele, 48 Teams, Kickoffs in UTC).
+Fachlogik: lib/scoring.ts (additive Punkte 5/1/1/3, K.o. x2; Zusatzfragen lib/bonus.ts: 50/20/20, tippbar bis K.o.-Start), lib/data.ts (offizieller WM-2026-Spielplan: 104 Spiele, 48 Teams, Kickoffs in UTC).
 Mehrspieler: E-Mail+Passwort (scrypt, lib/server/password.ts) mit Verifikations-Link und Passwort-Reset (auth_tokens, Mail via Resend in lib/server/mail.ts — ohne RESEND_API_KEY/MAIL_FROM zeigt das UI den Link direkt) oder Google-OAuth (lib/server/google.ts, GOOGLE_CLIENT_ID/SECRET, gilt als verifiziert, Konto-Match per E-Mail), Session-Cookie; Postgres async via DATABASE_URL (Neon auf Vercel, Pool aus @neondatabase/serverless) bzw. PGlite in .data/pglite ohne DATABASE_URL — Tests: PGLITE_DATA_DIR=memory:// (lib/server/db.ts, lib/server/auth.ts). API unter app/api/ (auth, tips, leaderboard, matches, live, cron), Client-Helfer lib/api.ts + lib/hooks.ts. Tipps bis Anstoss änderbar (Server prüft, 422), fremde Tipps erst nach Anstoss einsehbar.
 Resultate: ausschliesslich automatisch via football-data.org (FOOTBALL_DATA_TOKEN) — Cron-Import /api/cron/results (vercel.json, CRON_SECRET) + Live /api/live (Server-Cache); Merge in lib/server/matches.ts (currentMatches), Feed-Logik in lib/feed/. Spec: docs/spec-automatische-resultate.md.
 Seiten: app/ (Dashboard), app/tipps, app/rangliste, app/anmelden. Punktesystem-Popup: components/ScoringRules (Radix Dialog).
