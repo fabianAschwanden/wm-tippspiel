@@ -2,11 +2,16 @@
 import { beforeAll, describe, expect, it } from "vitest"
 import {
   allPlayersWithTips,
+  consumeAuthToken,
+  createAuthToken,
   createSession,
   deleteSession,
   findPlayerByEmail,
+  markVerified,
+  playerAuthByEmail,
   playerBySession,
   registerPlayer,
+  setPassword,
   tipsForPlayer,
   upsertTip,
 } from "./db"
@@ -39,6 +44,28 @@ describe("sessions", () => {
 
   it("kennt unbekannte Tokens nicht", async () => {
     expect(await playerBySession("gibtsnicht")).toBeNull()
+  })
+})
+
+describe("auth-tokens und verifikation", () => {
+  it("löst Tokens genau einmal und nur für den richtigen Zweck ein", async () => {
+    const player = (await registerPlayer("Tok", "tok@example.com"))!
+    const token = await createAuthToken(player.id, "verify")
+    expect(await consumeAuthToken(token, "reset")).toBeNull()
+    expect(await consumeAuthToken(token, "verify")).toBe(player.id)
+    expect(await consumeAuthToken(token, "verify")).toBeNull()
+  })
+
+  it("speichert Passwort-Hash und Verifikationsstatus", async () => {
+    const player = (await registerPlayer("Ver", "ver@example.com", "scrypt:salz:hash"))!
+    let auth = await playerAuthByEmail("ver@example.com")
+    expect(auth?.passwordHash).toBe("scrypt:salz:hash")
+    expect(auth?.verified).toBe(false)
+    await markVerified(player.id)
+    await setPassword(player.id, "scrypt:neu:hash")
+    auth = await playerAuthByEmail("ver@example.com")
+    expect(auth?.verified).toBe(true)
+    expect(auth?.passwordHash).toBe("scrypt:neu:hash")
   })
 })
 

@@ -50,6 +50,16 @@ const SCHEMA = [
     home_code TEXT,
     away_code TEXT
   )`,
+  // Passwort-Login + E-Mail-Verifikation (Bestands-Konten: beide Felder NULL)
+  `ALTER TABLE players ADD COLUMN IF NOT EXISTS password_hash TEXT`,
+  `ALTER TABLE players ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ`,
+  // Einmal-Tokens für E-Mail-Bestätigung und Passwort-Reset (24h gültig)
+  `CREATE TABLE IF NOT EXISTS auth_tokens (
+    token TEXT PRIMARY KEY,
+    player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    purpose TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`,
 ]
 
 let dbPromise: Promise<Queryable> | null = null
@@ -90,14 +100,87 @@ export async function findPlayerByEmail(email: string): Promise<PlayerAccount | 
 }
 
 /** Legt eine:n Spieler:in an; gibt null zurück, wenn die E-Mail bereits registriert ist. */
-export async function registerPlayer(name: string, email: string): Promise<PlayerAccount | null> {
+export async function registerPlayer(
+  name: string,
+  email: string,
+  passwordHash: string | null = null
+): Promise<PlayerAccount | null> {
   const db = await getDb()
   const { rows } = await db.query<{ id: number }>(
-    "INSERT INTO players (email, name) VALUES ($1, $2) ON CONFLICT (email) DO NOTHING RETURNING id",
-    [email, name]
+    "INSERT INTO players (email, name, password_hash) VALUES ($1, $2, $3) ON CONFLICT (email) DO NOTHING RETURNING id",
+    [email, name, passwordHash]
   )
   const id = rows[0]?.id
   return id === undefined ? null : { id, email, name }
+}
+
+/** Spieler:in inkl. Auth-Feldern, für Login/Verifikation. */
+export interface PlayerAuth extends PlayerAccount {
+  passwordHash: string | null
+  verified: boolean
+}
+
+export async function playerAuthByEmail(email: string): Promise<PlayerAuth | null> {
+  const db = await getDb()
+  const { rows } = await db.query<{
+    id: number
+    email: string
+    name: string
+    password_hash: string | null
+    verified_at: string | null
+  }>("SELECT id, email, name, password_hash, verified_at FROM players WHERE email = $1", [email])
+  const row = rows[0]
+  if (!row) {
+    return null
+  }
+  return {
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    passwordHash: row.password_hash,
+    verified: row.verified_at !== null,
+  }
+}
+
+/** Solange die E-Mail unbestätigt ist, darf eine erneute Registrierung Name/Passwort ersetzen. */
+export async function updateUnverifiedPlayer(playerId: number, name: string, passwordHash: string): Promise<void> {
+  const db = await getDb()
+  await db.query("UPDATE players SET name = $2, password_hash = $3 WHERE id = $1 AND verified_at IS NULL", [
+    playerId,
+    name,
+    passwordHash,
+  ])
+}
+
+export async function setPassword(playerId: number, passwordHash: string): Promise<void> {
+  const db = await getDb()
+  await db.query("UPDATE players SET password_hash = $2 WHERE id = $1", [playerId, passwordHash])
+}
+
+export async function markVerified(playerId: number): Promise<void> {
+  const db = await getDb()
+  await db.query("UPDATE players SET verified_at = coalesce(verified_at, now()) WHERE id = $1", [playerId])
+}
+
+export type TokenPurpose = "verify" | "reset"
+
+export async function createAuthToken(playerId: number, purpose: TokenPurpose): Promise<string> {
+  const token = randomBytes(32).toString("hex")
+  const db = await getDb()
+  await db.query("INSERT INTO auth_tokens (token, player_id, purpose) VALUES ($1, $2, $3)", [token, playerId, purpose])
+  return token
+}
+
+/** Löst ein Einmal-Token ein (löscht es); null wenn unbekannt, falscher Zweck oder älter als 24h. */
+export async function consumeAuthToken(token: string, purpose: TokenPurpose): Promise<number | null> {
+  const db = await getDb()
+  const { rows } = await db.query<{ player_id: number }>(
+    `DELETE FROM auth_tokens
+     WHERE token = $1 AND purpose = $2 AND created_at > now() - interval '24 hours'
+     RETURNING player_id`,
+    [token, purpose]
+  )
+  return rows[0]?.player_id ?? null
 }
 
 export async function createSession(playerId: number): Promise<string> {

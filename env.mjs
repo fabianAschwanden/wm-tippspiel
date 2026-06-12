@@ -18,6 +18,9 @@ export const env = createEnv({
     /** Google-Login (OAuth 2.0); ohne diese Werte wird der Button mit Hinweis abgewiesen. */
     GOOGLE_CLIENT_ID: z.string().min(1).optional(),
     GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+    /** E-Mail-Versand (Verifikation/Passwort-Reset) via Resend; ohne Werte zeigt das UI den Link direkt an. */
+    RESEND_API_KEY: z.string().min(1).optional(),
+    MAIL_FROM: z.string().min(3).optional(),
   },
   client: {},
   runtimeEnv: {
@@ -28,5 +31,7 @@ export const env = createEnv({
     LIVE_CACHE_SECONDS: process.env.LIVE_CACHE_SECONDS,
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    MAIL_FROM: process.env.MAIL_FROM,
   },
 })

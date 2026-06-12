@@ -29,9 +29,6 @@ export async function POST() {
     const stats = await importFeedMatches(feed)
     return Response.json({ ok: true, stats })
   } catch (error) {
-    return Response.json(
-      { error: error instanceof Error ? error.message : "Abgleich fehlgeschlagen" },
-      { status: 502 }
-    )
+    return Response.json({ error: error instanceof Error ? error.message : "Abgleich fehlgeschlagen" }, { status: 502 })
   }
 }

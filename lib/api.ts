@@ -17,11 +17,27 @@ export async function fetchMe(): Promise<PlayerAccount | null> {
   return body.player
 }
 
-export async function register(name: string, email: string): Promise<{ player?: PlayerAccount; error?: string }> {
+export async function register(
+  name: string,
+  email: string,
+  password: string
+): Promise<{ pending?: boolean; verifyUrl?: string; error?: string }> {
   const response = await fetch("/api/auth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, email }),
+    body: JSON.stringify({ name, email, password }),
+  })
+  if (!response.ok) {
+    return { error: await readError(response) }
+  }
+  return (await response.json()) as { pending: boolean; verifyUrl?: string }
+}
+
+export async function login(email: string, password: string): Promise<{ player?: PlayerAccount; error?: string }> {
+  const response = await fetch("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
   })
   if (!response.ok) {
     return { error: await readError(response) }
@@ -29,8 +45,9 @@ export async function register(name: string, email: string): Promise<{ player?: 
   return (await response.json()) as { player: PlayerAccount }
 }
 
-export async function login(email: string): Promise<{ player?: PlayerAccount; error?: string }> {
-  const response = await fetch("/api/auth/login", {
+/** Passwort-Reset-Link anfordern (auch zum erstmaligen Passwort-Setzen für Bestands-Konten). */
+export async function requestReset(email: string): Promise<{ resetUrl?: string; error?: string }> {
+  const response = await fetch("/api/auth/request-reset", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email }),
@@ -38,7 +55,19 @@ export async function login(email: string): Promise<{ player?: PlayerAccount; er
   if (!response.ok) {
     return { error: await readError(response) }
   }
-  return (await response.json()) as { player: PlayerAccount }
+  return (await response.json()) as { resetUrl?: string }
+}
+
+export async function resetPassword(token: string, password: string): Promise<{ error?: string }> {
+  const response = await fetch("/api/auth/reset", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, password }),
+  })
+  if (!response.ok) {
+    return { error: await readError(response) }
+  }
+  return {}
 }
 
 export async function logout(): Promise<void> {
