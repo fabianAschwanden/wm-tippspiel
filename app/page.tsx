@@ -5,24 +5,18 @@ import { useEffect, useState } from "react"
 import { ScoringRules } from "components/ScoringRules/ScoringRules"
 import { fetchLeaderboard, fetchMe } from "lib/api"
 import { MATCHES } from "lib/data"
+import { dayLabel, timeLabel } from "lib/dates"
 import { rankOf } from "lib/leaderboard"
 import type { Player, PlayerAccount } from "lib/types"
-
-const kickoffFormat = new Intl.DateTimeFormat("de-CH", {
-  weekday: "short",
-  day: "2-digit",
-  month: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  timeZone: "Europe/Zurich",
-})
 
 export default function Dashboard() {
   const [player, setPlayer] = useState<PlayerAccount | null>(null)
   const [leaderboard, setLeaderboard] = useState<Player[]>([])
   const [loaded, setLoaded] = useState(false)
+  const [now, setNow] = useState<number | null>(null)
 
   useEffect(() => {
+    setNow(Date.now())
     void Promise.all([fetchMe(), fetchLeaderboard()]).then(([me, players]) => {
       setPlayer(me)
       setLeaderboard(players)
@@ -32,7 +26,8 @@ export default function Dashboard() {
 
   const points = leaderboard.find((p) => p.isCurrentUser)?.points ?? 0
   const rank = player ? rankOf(leaderboard, player.id) : 0
-  const upcoming = MATCHES.filter((m) => !m.result)
+  // erst nach Client-Mount (now gesetzt) werden bereits angepfiffene Spiele ausgeblendet
+  const upcoming = MATCHES.filter((m) => !m.result && (now === null || new Date(m.kickoff).getTime() > now))
     .sort((a, b) => a.kickoff.localeCompare(b.kickoff))
     .slice(0, 4)
 
@@ -115,7 +110,8 @@ export default function Dashboard() {
                   {match.stage === "Gruppenphase" ? `Gruppe ${match.group}` : match.stage}
                 </p>
                 <p>
-                  {kickoffFormat.format(new Date(match.kickoff))}
+                  <span className="font-medium text-gray-300">{dayLabel(match.kickoff, now)}</span>
+                  {` · ${timeLabel(match.kickoff)}`}
                   {match.venue ? ` · ${match.venue}` : ""}
                 </p>
               </div>

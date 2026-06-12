@@ -5,18 +5,26 @@ import { useEffect, useState } from "react"
 import { ScoringRules } from "components/ScoringRules/ScoringRules"
 import { fetchMe, fetchTips, saveTip } from "lib/api"
 import { MATCHES } from "lib/data"
+import { dayKey, dayLabel, timeLabel } from "lib/dates"
 import { pointsForTip } from "lib/scoring"
 import type { Match, PlayerAccount, Tips } from "lib/types"
 
-const STAGES = [
-  "Gruppenphase",
-  "Sechzehntelfinale",
-  "Achtelfinale",
-  "Viertelfinale",
-  "Halbfinale",
-  "Spiel um Platz 3",
-  "Final",
-] as const
+/** Spielplan chronologisch, gruppiert nach Kalendertag (Schweizer Zeit). */
+const MATCH_DAYS: { key: string; matches: Match[] }[] = []
+for (const match of [...MATCHES].sort((a, b) => a.kickoff.localeCompare(b.kickoff))) {
+  const key = dayKey(match.kickoff)
+  const day = MATCH_DAYS[MATCH_DAYS.length - 1]
+  if (day && day.key === key) {
+    day.matches.push(match)
+  } else {
+    MATCH_DAYS.push({ key, matches: [match] })
+  }
+}
+
+/** z.B. "Gruppenphase" oder "Spiel um Platz 3 · Final" an Tagen mit mehreren Runden. */
+function stagesOf(matches: Match[]): string {
+  return Array.from(new Set(matches.map((m) => m.stage))).join(" · ")
+}
 
 export default function TippsPage() {
   const [player, setPlayer] = useState<PlayerAccount | null>(null)
@@ -82,14 +90,17 @@ export default function TippsPage() {
         </p>
       )}
 
-      {STAGES.map((stage) => {
-        const matches = MATCHES.filter((m) => m.stage === stage)
-        if (matches.length === 0) {
+      {MATCH_DAYS.map(({ key, matches }) => {
+        const first = matches[0]
+        if (!first) {
           return null
         }
         return (
-          <section key={stage}>
-            <h2 className="mb-3 text-sm font-bold tracking-widest text-emerald-300 uppercase">{stage}</h2>
+          <section key={key}>
+            <h2 className="mb-3 rounded-xl border border-gray-800 bg-gray-800/60 px-4 py-2.5 text-sm font-bold text-white">
+              {stagesOf(matches)} <span className="text-gray-500">·</span>{" "}
+              <span className="text-emerald-300">{dayLabel(first.kickoff, now)}</span>
+            </h2>
             <ul className="space-y-3">
               {matches.map((match) => (
                 <MatchTipRow
@@ -125,6 +136,15 @@ function MatchTipRow({
 
   return (
     <li className="rounded-2xl border border-gray-800 bg-gray-900/80 p-4">
+      <div className="mb-3 flex items-center justify-between gap-2 text-xs">
+        <span className="font-semibold text-emerald-300">
+          {match.group ? `Gruppe ${match.group}` : `Spiel ${match.id}`}
+        </span>
+        <span className="text-gray-400">
+          {timeLabel(match.kickoff)}
+          {match.venue ? ` · ${match.venue}` : ""}
+        </span>
+      </div>
       <div className="flex items-center justify-between gap-2">
         {/* Heim */}
         <div className="flex min-w-0 flex-1 items-center justify-end gap-2 text-right">
