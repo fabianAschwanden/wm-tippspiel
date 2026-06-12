@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return Response.json({ error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe" }, { status: 400 })
   }
-  const player = registerPlayer(parsed.data.name, parsed.data.email)
+  const player = await registerPlayer(parsed.data.name, parsed.data.email)
   if (!player) {
     return Response.json({ error: "Diese E-Mail ist bereits registriert — bitte anmelden." }, { status: 409 })
   }

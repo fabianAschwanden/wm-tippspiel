@@ -1,19 +1,23 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { ScoringRules } from "components/ScoringRules/ScoringRules"
-import { fetchLeaderboard, fetchMe } from "lib/api"
-import { MATCHES } from "lib/data"
+import { fetchLeaderboard, fetchMe, fetchTips } from "lib/api"
 import { dayLabel, timeLabel } from "lib/dates"
+import { useLive, useMatches } from "lib/hooks"
 import { rankOf } from "lib/leaderboard"
-import type { Player, PlayerAccount } from "lib/types"
+import { pointsForTip } from "lib/scoring"
+import type { Player, PlayerAccount, Tips } from "lib/types"
 
 export default function Dashboard() {
   const [player, setPlayer] = useState<PlayerAccount | null>(null)
   const [leaderboard, setLeaderboard] = useState<Player[]>([])
+  const [tips, setTips] = useState<Tips>({})
   const [loaded, setLoaded] = useState(false)
   const [now, setNow] = useState<number | null>(null)
+  const matches = useMatches()
+  const live = useLive()
 
   useEffect(() => {
     setNow(Date.now())
@@ -21,15 +25,27 @@ export default function Dashboard() {
       setPlayer(me)
       setLeaderboard(players)
       setLoaded(true)
+      if (me) {
+        void fetchTips().then(setTips)
+      }
     })
   }, [])
 
   const points = leaderboard.find((p) => p.isCurrentUser)?.points ?? 0
   const rank = player ? rankOf(leaderboard, player.id) : 0
   // erst nach Client-Mount (now gesetzt) werden bereits angepfiffene Spiele ausgeblendet
-  const upcoming = MATCHES.filter((m) => !m.result && (now === null || new Date(m.kickoff).getTime() > now))
+  const upcoming = matches
+    .filter((m) => !m.result && (now === null || new Date(m.kickoff).getTime() > now))
     .sort((a, b) => a.kickoff.localeCompare(b.kickoff))
     .slice(0, 4)
+
+  const liveMatches = useMemo(() => {
+    const byId = new Map(matches.map((m) => [m.id, m]))
+    return (live?.scores ?? []).flatMap((score) => {
+      const match = byId.get(score.matchId)
+      return match ? [{ match, score }] : []
+    })
+  }, [matches, live])
 
   return (
     <div className="space-y-8">
@@ -74,6 +90,62 @@ export default function Dashboard() {
             </div>
             <ScoringRules />
           </div>
+        </section>
+      )}
+
+      {/* Jetzt live */}
+      {liveMatches.length > 0 && (
+        <section>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-lg font-bold text-white">
+              <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-400" aria-hidden />
+              Jetzt live
+            </h2>
+            {live?.stale && <span className="text-xs text-gray-500">Stand {timeLabel(live.updatedAt)}</span>}
+          </div>
+          <ul className="space-y-3">
+            {liveMatches.map(({ match, score }) => {
+              const tip = tips[match.id]
+              const liveScore =
+                score.home !== null && score.away !== null ? { home: score.home, away: score.away } : null
+              const liveEarned = tip && liveScore ? pointsForTip(tip, liveScore) : null
+              return (
+                <li
+                  key={match.id}
+                  className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-800/60 bg-gray-900/80 p-4"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="text-2xl" aria-hidden>
+                      {match.home.flag}
+                    </span>
+                    <span className="truncate font-semibold">{match.home.name}</span>
+                    <span className="text-xl font-extrabold text-white tabular-nums">
+                      {liveScore ? `${liveScore.home}:${liveScore.away}` : "–:–"}
+                    </span>
+                    <span className="truncate font-semibold">{match.away.name}</span>
+                    <span className="text-2xl" aria-hidden>
+                      {match.away.flag}
+                    </span>
+                  </div>
+                  <div className="shrink-0 text-right text-xs">
+                    <p className="inline-flex items-center gap-1.5 rounded-full bg-emerald-900/80 px-2 py-0.5 font-bold text-emerald-300">
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" aria-hidden />
+                      {score.status === "PAUSED" ? "Pause" : "LIVE"}
+                      {score.minute !== null ? ` ${score.minute}’` : ""}
+                    </p>
+                    {tip && (
+                      <p className="mt-1 text-gray-400">
+                        Dein Tipp {tip.home}:{tip.away}
+                        {liveEarned !== null && (
+                          <span className="ml-1.5 font-bold text-emerald-300">+{liveEarned} P live</span>
+                        )}
+                      </p>
+                    )}
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
         </section>
       )}
 

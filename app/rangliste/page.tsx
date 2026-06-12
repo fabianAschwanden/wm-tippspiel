@@ -8,15 +8,34 @@ const MEDALS = ["🥇", "🥈", "🥉"]
 
 export default function RanglistePage() {
   const [players, setPlayers] = useState<Player[] | null>(null)
+  const [includeLive, setIncludeLive] = useState(false)
 
   useEffect(() => {
-    void fetchLeaderboard().then(setPlayers)
-  }, [])
+    void fetchLeaderboard(includeLive).then(setPlayers)
+  }, [includeLive])
 
   return (
     <div>
       <h1 className="text-2xl font-extrabold">Rangliste</h1>
-      <p className="mt-1 mb-4 text-sm text-gray-400">Alle registrierten Mitspielenden im Überblick.</p>
+      <div className="mt-1 mb-4 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-gray-400">
+          Alle registrierten Mitspielenden. Bei Punktgleichheit zählt die Anzahl exakter Tipps.
+        </p>
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-300">
+          <input
+            type="checkbox"
+            checked={includeLive}
+            onChange={(e) => setIncludeLive(e.target.checked)}
+            className="h-4 w-4 accent-emerald-500"
+          />
+          inkl. laufende Spiele
+        </label>
+      </div>
+      {includeLive && (
+        <p className="mb-3 rounded-xl border border-emerald-800/60 bg-emerald-950/40 px-3 py-2 text-xs text-emerald-300">
+          Projektion mit Live-Zwischenständen — die offizielle Wertung zählt nur Endstände.
+        </p>
+      )}
       <div className="overflow-hidden rounded-2xl border border-gray-800">
         <table className="w-full text-left">
           <thead className="bg-emerald-950/60 text-xs tracking-widest text-emerald-300 uppercase">
@@ -36,7 +55,10 @@ export default function RanglistePage() {
                     <span className="ml-2 rounded-full bg-emerald-700 px-2 py-0.5 text-xs font-bold">Du</span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-right text-lg font-extrabold text-white tabular-nums">{player.points}</td>
+                <td className="px-4 py-3 text-right">
+                  <span className="text-lg font-extrabold text-white tabular-nums">{player.points}</span>
+                  <span className="ml-2 text-xs text-gray-500">{player.exact} exakt</span>
+                </td>
               </tr>
             ))}
             {players === null && (

@@ -39,3 +39,14 @@ export function totalPoints(tips: Tips, matches: Match[]): number {
     return sum + pointsForTip(tip, match.result)
   }, 0)
 }
+
+/** Anzahl exakt getippter Resultate (Tie-Breaker der Rangliste). */
+export function countExactTips(tips: Tips, matches: Match[]): number {
+  return matches.reduce((count, match) => {
+    const tip = tips[match.id]
+    if (!match.result || !tip) {
+      return count
+    }
+    return count + (pointsForTip(tip, match.result) === 3 ? 1 : 0)
+  }, 0)
+}

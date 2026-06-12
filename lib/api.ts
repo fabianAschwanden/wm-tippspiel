@@ -1,4 +1,4 @@
-import type { Player, PlayerAccount, Score, Tips } from "./types"
+import type { LiveSnapshot, Match, Player, PlayerAccount, Score, Tips } from "./types"
 
 /** Client-Helfer für die API-Routen. Fehler kommen als { error } mit Nicht-2xx-Status. */
 
@@ -65,11 +65,39 @@ export async function saveTip(matchId: number, tip: Score): Promise<{ error?: st
   return {}
 }
 
-export async function fetchLeaderboard(): Promise<Player[]> {
-  const response = await fetch("/api/leaderboard")
+export async function fetchLeaderboard(includeLive = false): Promise<Player[]> {
+  const response = await fetch(includeLive ? "/api/leaderboard?live=1" : "/api/leaderboard")
   if (!response.ok) {
     return []
   }
   const body = (await response.json()) as { players: Player[] }
   return body.players
+}
+
+/** Spielplan inkl. importierter Resultate; null bei Fehler (Aufrufer behält den statischen Stand). */
+export async function fetchMatches(): Promise<Match[] | null> {
+  const response = await fetch("/api/matches")
+  if (!response.ok) {
+    return null
+  }
+  const body = (await response.json()) as { matches: Match[] }
+  return body.matches
+}
+
+export async function fetchLive(): Promise<LiveSnapshot | null> {
+  const response = await fetch("/api/live")
+  if (!response.ok) {
+    return null
+  }
+  return (await response.json()) as LiveSnapshot
+}
+
+/** Tipps aller Mitspielenden zu einem Spiel (erst nach Anstoss freigegeben). */
+export async function fetchMatchTips(matchId: number): Promise<{ name: string; tip: Score }[] | null> {
+  const response = await fetch(`/api/matches/${matchId}/tips`)
+  if (!response.ok) {
+    return null
+  }
+  const body = (await response.json()) as { tips: { name: string; tip: Score }[] }
+  return body.tips
 }

@@ -31,7 +31,30 @@ describe("buildLeaderboard", () => {
     expect(players.find((p) => p.isCurrentUser)?.name).toBe("Anna")
   })
 
-  it("bricht Gleichstand alphabetisch", () => {
+  it("bricht Punktgleichstand mit der Anzahl exakter Tipps, danach alphabetisch", () => {
+    const twoMatches: Match[] = [
+      ...matches,
+      {
+        id: 3,
+        stage: "Gruppenphase",
+        kickoff: "2026-06-13T18:00:00Z",
+        home: team("GGG"),
+        away: team("HHH"),
+        result: { home: 1, away: 0 },
+      },
+    ]
+    const players = buildLeaderboard(
+      [
+        { id: 1, name: "Zoe", tips: { 1: { home: 2, away: 1 } } }, // exakt -> 3 P, 1 exakt
+        { id: 2, name: "Ben", tips: { 1: { home: 3, away: 2 }, 3: { home: 2, away: 0 } } }, // 2 P + 1 P -> 3 P, 0 exakt
+      ],
+      twoMatches
+    )
+    expect(players.map((p) => p.points)).toEqual([3, 3])
+    expect(players.map((p) => p.name)).toEqual(["Zoe", "Ben"])
+  })
+
+  it("bricht völligen Gleichstand alphabetisch", () => {
     const players = buildLeaderboard(
       [
         { id: 1, name: "Zoe", tips: {} },

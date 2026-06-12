@@ -37,3 +37,5 @@ storybook-static/
 .pnpm-store/
 # SQLite-Datenbank (Spieler, Sessions, Tipps)
 /.data/
+.vercel
+.env*

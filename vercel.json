@@ -1,4 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "corepack enable && pnpm install"
+  "installCommand": "corepack enable && pnpm install",
+  "crons": [
+    {
+      "path": "/api/cron/results",
+      "schedule": "*/15 * * * *"
+    }
+  ]
 }

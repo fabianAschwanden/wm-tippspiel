@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return Response.json({ error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe" }, { status: 400 })
   }
-  const player = findPlayerByEmail(parsed.data.email)
+  const player = await findPlayerByEmail(parsed.data.email)
   if (!player) {
     return Response.json({ error: "E-Mail nicht gefunden — bitte zuerst registrieren." }, { status: 404 })
   }

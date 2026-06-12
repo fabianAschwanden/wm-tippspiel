@@ -30,6 +30,10 @@ export function ScoringRules() {
               </li>
             ))}
           </ul>
+          <p className="mt-4 rounded-xl bg-gray-800/60 px-3 py-2 text-xs text-gray-400">
+            Resultate kommen automatisch aus dem Datenfeed. Gewertet wird der Gesamtendstand gemäss Feed — in der
+            K.o.-Runde inklusive Verlängerung und Penaltys.
+          </p>
           <Dialog.Close className="mt-6 w-full rounded-xl bg-emerald-600 py-2.5 font-semibold text-white transition-colors hover:bg-emerald-500">
             Verstanden
           </Dialog.Close>

@@ -17,7 +17,7 @@ export async function currentPlayer(): Promise<PlayerAccount | null> {
 
 /** Nur in Route Handlers aufrufen (setzt Cookies). */
 export async function startSession(playerId: number): Promise<void> {
-  const token = createSession(playerId)
+  const token = await createSession(playerId)
   const store = await cookies()
   store.set(SESSION_COOKIE, token, {
     httpOnly: true,
@@ -33,7 +33,7 @@ export async function endSession(): Promise<void> {
   const store = await cookies()
   const token = store.get(SESSION_COOKIE)?.value
   if (token) {
-    deleteSession(token)
+    await deleteSession(token)
     store.delete(SESSION_COOKIE)
   }
 }

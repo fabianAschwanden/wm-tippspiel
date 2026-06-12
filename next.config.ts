@@ -5,6 +5,8 @@ import { env } from "./env.mjs"
 
 const config: NextConfig = {
   reactStrictMode: true,
+  // PGlite (lokales Postgres) bringt WASM-Assets mit und darf nicht gebundelt werden
+  serverExternalPackages: ["@electric-sql/pglite"],
   logging: {
     fetches: {
       fullUrl: true,

@@ -1,36 +1,21 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { ScoringRules } from "components/ScoringRules/ScoringRules"
-import { fetchMe, fetchTips, saveTip } from "lib/api"
-import { MATCHES } from "lib/data"
+import { fetchMatchTips, fetchMe, fetchTips, saveTip } from "lib/api"
 import { dayKey, dayLabel, timeLabel } from "lib/dates"
+import { useLive, useMatches } from "lib/hooks"
 import { pointsForTip } from "lib/scoring"
-import type { Match, PlayerAccount, Tips } from "lib/types"
-
-/** Spielplan chronologisch, gruppiert nach Kalendertag (Schweizer Zeit). */
-const MATCH_DAYS: { key: string; matches: Match[] }[] = []
-for (const match of [...MATCHES].sort((a, b) => a.kickoff.localeCompare(b.kickoff))) {
-  const key = dayKey(match.kickoff)
-  const day = MATCH_DAYS[MATCH_DAYS.length - 1]
-  if (day && day.key === key) {
-    day.matches.push(match)
-  } else {
-    MATCH_DAYS.push({ key, matches: [match] })
-  }
-}
-
-/** z.B. "Gruppenphase" oder "Spiel um Platz 3 · Final" an Tagen mit mehreren Runden. */
-function stagesOf(matches: Match[]): string {
-  return Array.from(new Set(matches.map((m) => m.stage))).join(" · ")
-}
+import type { LiveScore, Match, PlayerAccount, Score, Tips } from "lib/types"
 
 export default function TippsPage() {
   const [player, setPlayer] = useState<PlayerAccount | null>(null)
   const [tips, setTips] = useState<Tips | null>(null)
   const [now, setNow] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const matches = useMatches()
+  const live = useLive()
 
   useEffect(() => {
     setNow(Date.now())
@@ -43,6 +28,23 @@ export default function TippsPage() {
       }
     })
   }, [])
+
+  /** Spielplan chronologisch, gruppiert nach Kalendertag (Schweizer Zeit). */
+  const matchDays = useMemo(() => {
+    const days: { key: string; matches: Match[] }[] = []
+    for (const match of [...matches].sort((a, b) => a.kickoff.localeCompare(b.kickoff))) {
+      const key = dayKey(match.kickoff)
+      const day = days[days.length - 1]
+      if (day && day.key === key) {
+        day.matches.push(match)
+      } else {
+        days.push({ key, matches: [match] })
+      }
+    }
+    return days
+  }, [matches])
+
+  const liveByMatch = useMemo(() => new Map((live?.scores ?? []).map((s) => [s.matchId, s])), [live])
 
   const setTip = (matchId: number, side: "home" | "away", value: string) => {
     if (!tips || !player) {
@@ -62,7 +64,7 @@ export default function TippsPage() {
   }
 
   // Tipps sind bis zum Anstoss möglich; vorher gerendert = gesperrt (kein Hydration-Mismatch)
-  const isLocked = (match: Match) => Boolean(match.result) || now === null || new Date(match.kickoff).getTime() <= now
+  const isStarted = (match: Match) => now === null || new Date(match.kickoff).getTime() <= now
 
   return (
     <div className="space-y-8">
@@ -90,24 +92,27 @@ export default function TippsPage() {
         </p>
       )}
 
-      {MATCH_DAYS.map(({ key, matches }) => {
-        const first = matches[0]
+      {matchDays.map(({ key, matches: dayMatches }) => {
+        const first = dayMatches[0]
         if (!first) {
           return null
         }
+        const stages = Array.from(new Set(dayMatches.map((m) => m.stage))).join(" · ")
         return (
           <section key={key}>
             <h2 className="mb-3 rounded-xl border border-gray-800 bg-gray-800/60 px-4 py-2.5 text-sm font-bold text-white">
-              {stagesOf(matches)} <span className="text-gray-500">·</span>{" "}
+              {stages} <span className="text-gray-500">·</span>{" "}
               <span className="text-emerald-300">{dayLabel(first.kickoff, now)}</span>
             </h2>
             <ul className="space-y-3">
-              {matches.map((match) => (
+              {dayMatches.map((match) => (
                 <MatchTipRow
                   key={match.id}
                   match={match}
                   tips={tips}
-                  locked={isLocked(match) || !player}
+                  locked={Boolean(match.result) || isStarted(match) || !player}
+                  live={liveByMatch.get(match.id)}
+                  canReveal={Boolean(player) && isStarted(match) && now !== null}
                   onTip={setTip}
                 />
               ))}
@@ -123,16 +128,23 @@ function MatchTipRow({
   match,
   tips,
   locked,
+  live,
+  canReveal,
   onTip,
 }: {
   match: Match
   tips: Tips | null
   locked: boolean
+  live: LiveScore | undefined
+  canReveal: boolean
   onTip: (matchId: number, side: "home" | "away", value: string) => void
 }) {
   const tip = tips?.[match.id]
   const finished = Boolean(match.result)
   const earned = finished && tip && match.result ? pointsForTip(tip, match.result) : null
+  const liveScore: Score | null =
+    live && live.home !== null && live.away !== null ? { home: live.home, away: live.away } : null
+  const liveEarned = !finished && liveScore && tip ? pointsForTip(tip, liveScore) : null
 
   return (
     <li className="rounded-2xl border border-gray-800 bg-gray-900/80 p-4">
@@ -140,7 +152,14 @@ function MatchTipRow({
         <span className="font-semibold text-emerald-300">
           {match.group ? `Gruppe ${match.group}` : `Spiel ${match.id}`}
         </span>
-        <span className="text-gray-400">
+        <span className="flex items-center gap-2 text-gray-400">
+          {live && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-900/80 px-2 py-0.5 font-bold text-emerald-300">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" aria-hidden />
+              {live.status === "PAUSED" ? "Pause" : "LIVE"}
+              {live.minute !== null ? ` ${live.minute}’` : ""}
+            </span>
+          )}
           {timeLabel(match.kickoff)}
           {match.venue ? ` · ${match.venue}` : ""}
         </span>
@@ -209,6 +228,54 @@ function MatchTipRow({
           )}
         </p>
       )}
+
+      {!finished && liveScore && (
+        <p className="mt-2 text-center text-xs text-gray-400">
+          Zwischenstand{" "}
+          <span className="font-bold text-white">
+            {liveScore.home}:{liveScore.away}
+          </span>
+          {liveEarned !== null && (
+            <span className="ml-2 animate-pulse rounded-full border border-dashed border-emerald-500 px-2 py-0.5 font-bold text-emerald-300">
+              +{liveEarned} P live
+            </span>
+          )}
+        </p>
+      )}
+
+      {canReveal && <OtherTips matchId={match.id} />}
     </li>
+  )
+}
+
+/** Tipps der anderen — erst nach Anstoss einsehbar (Spec §4.4). */
+function OtherTips({ matchId }: { matchId: number }) {
+  const [others, setOthers] = useState<{ name: string; tip: Score }[] | null>(null)
+  const [open, setOpen] = useState(false)
+
+  const toggle = () => {
+    setOpen(!open)
+    if (!others) {
+      void fetchMatchTips(matchId).then(setOthers)
+    }
+  }
+
+  return (
+    <div className="mt-2 text-center text-xs">
+      <button
+        type="button"
+        onClick={toggle}
+        className="text-gray-500 underline-offset-2 transition-colors hover:text-emerald-300 hover:underline"
+      >
+        {open ? "Tipps der anderen ausblenden" : "Tipps der anderen anzeigen"}
+      </button>
+      {open && others && (
+        <p className="mt-1 text-gray-400">
+          {others.length === 0
+            ? "Niemand hat dieses Spiel getippt."
+            : others.map(({ name, tip }) => `${name} ${tip.home}:${tip.away}`).join(" · ")}
+        </p>
+      )}
+    </div>
   )
 }

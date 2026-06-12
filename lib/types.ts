@@ -43,10 +43,29 @@ export interface PlayerAccount {
   email: string
 }
 
+/** Live-Zwischenstand eines laufenden Spiels (Anzeige, keine Wertung). */
+export interface LiveScore {
+  matchId: number
+  status: "LIVE" | "PAUSED"
+  home: number | null
+  away: number | null
+  minute: number | null
+}
+
+export interface LiveSnapshot {
+  scores: LiveScore[]
+  /** Zeitpunkt des letzten erfolgreichen Stands (für «Stand 18:42» bei Feed-Ausfall) */
+  updatedAt: string
+  /** true, wenn der letzte Upstream-Versuch fehlschlug und ein älterer Stand gezeigt wird */
+  stale: boolean
+}
+
 /** Eintrag in der Rangliste. */
 export interface Player {
   id: number
   name: string
   points: number
+  /** Anzahl exakt getippter Resultate (Tie-Breaker) */
+  exact: number
   isCurrentUser?: boolean
 }
