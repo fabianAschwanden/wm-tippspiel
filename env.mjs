@@ -15,6 +15,9 @@ export const env = createEnv({
     CRON_SECRET: z.string().min(1).optional(),
     /** Serverseitiger Cache für /api/live in Sekunden (Default 30). */
     LIVE_CACHE_SECONDS: z.coerce.number().int().positive().optional(),
+    /** Google-Login (OAuth 2.0); ohne diese Werte wird der Button mit Hinweis abgewiesen. */
+    GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+    GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
   },
   client: {},
   runtimeEnv: {
@@ -23,5 +26,7 @@ export const env = createEnv({
     FOOTBALL_DATA_TOKEN: process.env.FOOTBALL_DATA_TOKEN,
     CRON_SECRET: process.env.CRON_SECRET,
     LIVE_CACHE_SECONDS: process.env.LIVE_CACHE_SECONDS,
+    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
   },
 })
