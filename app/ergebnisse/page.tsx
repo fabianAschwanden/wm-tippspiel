@@ -24,7 +24,13 @@ interface MatchWithTips {
   tips: PlayerTipRow[]
 }
 
-function tipColor(tip: { home: number; away: number } | null, result: { home: number; away: number }, stage: Stage): string {
+const PAGE_SIZE = 10
+
+function tipColor(
+  tip: { home: number; away: number } | null,
+  result: { home: number; away: number },
+  stage: Stage
+): string {
   if (!tip) return "text-gray-600"
   const pts = pointsForTip(tip, result, stage)
   const max = stage === "Gruppenphase" ? 10 : 20
@@ -34,7 +40,15 @@ function tipColor(tip: { home: number; away: number } | null, result: { home: nu
   return "text-red-400"
 }
 
-function TipCell({ tip, result, stage }: { tip: { home: number; away: number } | null; result: { home: number; away: number }; stage: Stage }) {
+function TipCell({
+  tip,
+  result,
+  stage,
+}: {
+  tip: { home: number; away: number } | null
+  result: { home: number; away: number }
+  stage: Stage
+}) {
   if (!tip) return <span className="text-gray-600">—</span>
   const pts = pointsForTip(tip, result, stage)
   return (
@@ -47,6 +61,7 @@ function TipCell({ tip, result, stage }: { tip: { home: number; away: number } |
 
 export default function ErgebnissePage() {
   const [data, setData] = useState<MatchWithTips[] | null>(null)
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     void fetch("/api/results/tips")
@@ -67,11 +82,15 @@ export default function ErgebnissePage() {
     )
   }
 
-  // Alle Spieler aus dem ersten Match (Reihenfolge konsistent)
-  const allPlayers = data[0]?.tips ?? []
-  const humans = allPlayers.filter((p) => !p.isBot)
-  const bots = allPlayers.filter((p) => p.isBot)
-  const columns = [...humans, ...bots]
+  const totalPages = Math.ceil(data.length / PAGE_SIZE)
+  const paginated = data.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  // Spieler-Reihenfolge aus allen Daten ableiten (konsistent über alle Seiten)
+  const allPlayers = data.flatMap((m) => m.tips).reduce<PlayerTipRow[]>((acc, t) => {
+    if (!acc.find((p) => p.playerId === t.playerId)) acc.push(t)
+    return acc
+  }, [])
+  const columns = [...allPlayers.filter((p) => !p.isBot), ...allPlayers.filter((p) => p.isBot)]
 
   return (
     <div>
@@ -81,9 +100,8 @@ export default function ErgebnissePage() {
       </p>
 
       <div className="space-y-4">
-        {data.map((match) => (
+        {paginated.map((match) => (
           <div key={match.matchId} className="overflow-hidden rounded-2xl border border-gray-800 bg-gray-900/60">
-            {/* Spielkopf */}
             <div className="flex items-center justify-between gap-2 border-b border-gray-800 px-4 py-3">
               <div className="flex items-center gap-2 text-base font-bold">
                 <span title={match.homeTeam}>{match.homeFlag}</span>
@@ -93,12 +111,15 @@ export default function ErgebnissePage() {
                 <span title={match.awayTeam}>{match.awayFlag}</span>
               </div>
               <div className="text-right text-xs text-gray-400">
-                <div>{match.homeTeam} – {match.awayTeam}</div>
-                <div>{dayLabel(match.kickoff)} · {match.stage}</div>
+                <div>
+                  {match.homeTeam} – {match.awayTeam}
+                </div>
+                <div>
+                  {dayLabel(match.kickoff)} · {match.stage}
+                </div>
               </div>
             </div>
 
-            {/* Tipp-Tabelle */}
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-800 text-xs text-gray-500">
@@ -114,7 +135,9 @@ export default function ErgebnissePage() {
                       <td className="py-2 pl-4 text-gray-300">
                         {col.playerName}
                         {col.isBot && (
-                          <span className="ml-1.5 rounded-full bg-indigo-900/60 px-1.5 py-0.5 text-xs text-indigo-300">Bot</span>
+                          <span className="ml-1.5 rounded-full bg-indigo-900/60 px-1.5 py-0.5 text-xs text-indigo-300">
+                            Bot
+                          </span>
                         )}
                       </td>
                       <td className="py-2 pr-4 text-right tabular-nums">
@@ -129,13 +152,46 @@ export default function ErgebnissePage() {
         ))}
       </div>
 
+      {/* Paging */}
+      {totalPages > 1 && (
+        <div className="mt-6 flex items-center justify-center gap-2">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="rounded-lg border border-gray-700 px-3 py-1.5 text-sm text-gray-300 disabled:opacity-30 hover:border-emerald-700 hover:text-white transition-colors"
+          >
+            ← Neuer
+          </button>
+          <span className="text-sm text-gray-500">
+            {page} / {totalPages}
+          </span>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            className="rounded-lg border border-gray-700 px-3 py-1.5 text-sm text-gray-300 disabled:opacity-30 hover:border-emerald-700 hover:text-white transition-colors"
+          >
+            Älter →
+          </button>
+        </div>
+      )}
+
       {/* Legende */}
       <div className="mt-6 flex flex-wrap gap-3 text-xs text-gray-500">
-        <span><span className="text-emerald-400">■</span> exakt</span>
-        <span><span className="text-amber-300">■</span> Tendenz / Differenz</span>
-        <span><span className="text-orange-400">■</span> Torzahl</span>
-        <span><span className="text-red-400">■</span> daneben</span>
-        <span><span className="text-gray-600">—</span> nicht getippt</span>
+        <span>
+          <span className="text-emerald-400">■</span> exakt
+        </span>
+        <span>
+          <span className="text-amber-300">■</span> Tendenz / Differenz
+        </span>
+        <span>
+          <span className="text-orange-400">■</span> Torzahl
+        </span>
+        <span>
+          <span className="text-red-400">■</span> daneben
+        </span>
+        <span>
+          <span className="text-gray-600">—</span> nicht getippt
+        </span>
       </div>
     </div>
   )
