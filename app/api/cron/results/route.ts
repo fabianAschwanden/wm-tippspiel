@@ -1,6 +1,9 @@
 import { env } from "env.mjs"
+import { generateTip } from "lib/bot"
 import { footballDataProvider } from "lib/feed/football-data"
 import { importFeedMatches } from "lib/feed/import"
+import { ensureBot, tipsForPlayer, upsertTip } from "lib/server/db"
+import { currentMatches } from "lib/server/matches"
 
 /**
  * Feed-Import (Spec §7): einzige Schreibquelle für Resultate.
@@ -13,6 +16,36 @@ function authorized(request: Request): boolean {
   return request.headers.get("authorization") === `Bearer ${env.CRON_SECRET}`
 }
 
+async function runBotTips(): Promise<{ tipped: number; skipped: number; errors: number }> {
+  if (!env.ANTHROPIC_API_KEY) return { tipped: 0, skipped: 0, errors: 0 }
+
+  const botId = await ensureBot()
+  const existingTips = await tipsForPlayer(botId)
+  const matches = await currentMatches()
+  const now = Date.now()
+  const in24h = now + 24 * 60 * 60 * 1000
+
+  // Spiele, die in den nächsten 24h stattfinden und noch nicht getippt sind
+  const upcoming = matches.filter((m) => {
+    if (existingTips[m.id]) return false
+    const kickoff = new Date(m.kickoff).getTime()
+    return kickoff > now && kickoff <= in24h
+  })
+
+  let tipped = 0
+  let errors = 0
+  for (const match of upcoming) {
+    const score = await generateTip(match, env.ANTHROPIC_API_KEY)
+    if (score) {
+      await upsertTip(botId, match.id, score)
+      tipped++
+    } else {
+      errors++
+    }
+  }
+  return { tipped, skipped: matches.length - upcoming.length - errors, errors }
+}
+
 async function runImport(request: Request): Promise<Response> {
   if (!authorized(request)) {
     return Response.json({ error: "Nicht autorisiert" }, { status: 401 })
@@ -22,8 +55,9 @@ async function runImport(request: Request): Promise<Response> {
   }
   try {
     const feed = await footballDataProvider.fetchMatches()
-    const stats = importFeedMatches(feed)
-    return Response.json({ ok: true, stats })
+    const stats = await importFeedMatches(feed)
+    const bot = await runBotTips()
+    return Response.json({ ok: true, stats, bot })
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Import fehlgeschlagen" }, { status: 502 })
   }

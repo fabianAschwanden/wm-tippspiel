@@ -10,6 +10,7 @@ export interface PlayerTips {
   name: string
   tips: Tips
   bonus: BonusTips
+  isBot?: boolean
 }
 
 /** Minimaler gemeinsamer Nenner von @neondatabase/serverless (Pool) und PGlite. */
@@ -70,6 +71,8 @@ const SCHEMA = [
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (player_id, question_id)
   )`,
+  // Bot-Spieler (is_bot = true: erscheint in Rangliste, kann nicht einloggen)
+  `ALTER TABLE players ADD COLUMN IF NOT EXISTS is_bot BOOLEAN NOT NULL DEFAULT false`,
 ]
 
 let dbPromise: Promise<Queryable> | null = null
@@ -245,17 +248,18 @@ export async function allPlayersWithTips(): Promise<PlayerTips[]> {
   const { rows } = await db.query<{
     id: number
     name: string
+    is_bot: boolean
     match_id: number | null
     home: number | null
     away: number | null
   }>(
-    `SELECT p.id, p.name, t.match_id, t.home, t.away FROM players p
+    `SELECT p.id, p.name, p.is_bot, t.match_id, t.home, t.away FROM players p
      LEFT JOIN tips t ON t.player_id = p.id
      ORDER BY p.id`
   )
   const players = new Map<number, PlayerTips>()
   for (const row of rows) {
-    const player = players.get(row.id) ?? { id: row.id, name: row.name, tips: {}, bonus: {} }
+    const player = players.get(row.id) ?? { id: row.id, name: row.name, tips: {}, bonus: {}, isBot: row.is_bot }
     if (row.match_id !== null && row.home !== null && row.away !== null) {
       player.tips[row.match_id] = { home: row.home, away: row.away }
     }
@@ -294,6 +298,28 @@ export async function upsertBonusTip(playerId: number, questionId: string, team:
      DO UPDATE SET team = excluded.team, updated_at = now()`,
     [playerId, questionId, team]
   )
+}
+
+const BOT_EMAIL = "bot@wm-tippspiel.internal"
+
+/** Legt den Bot-Account einmalig an (idempotent) und gibt seine ID zurück. */
+export async function ensureBot(name = "TippBot 🤖"): Promise<number> {
+  const db = await getDb()
+  const { rows } = await db.query<{ id: number }>(
+    `INSERT INTO players (email, name, is_bot, verified_at)
+     VALUES ($1, $2, true, now())
+     ON CONFLICT (email) DO UPDATE SET name = excluded.name
+     RETURNING id`,
+    [BOT_EMAIL, name]
+  )
+  return rows[0]!.id
+}
+
+/** Gibt die ID des Bot-Accounts zurück, oder null wenn noch nicht angelegt. */
+export async function botPlayerId(): Promise<number | null> {
+  const db = await getDb()
+  const { rows } = await db.query<{ id: number }>("SELECT id FROM players WHERE email = $1", [BOT_EMAIL])
+  return rows[0]?.id ?? null
 }
 
 /** Alle Tipps zu einem Spiel (Einsicht erst nach Anstoss, prüft der Aufrufer). */

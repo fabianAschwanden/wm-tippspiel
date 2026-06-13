@@ -21,6 +21,8 @@ export const env = createEnv({
     /** E-Mail-Versand (Verifikation/Passwort-Reset) via Resend; ohne Werte zeigt das UI den Link direkt an. */
     RESEND_API_KEY: z.string().min(1).optional(),
     MAIL_FROM: z.string().min(3).optional(),
+    /** TippBot: Claude API-Key für automatische Tipps via Web-Suche; ohne Key bleibt der Bot inaktiv. */
+    ANTHROPIC_API_KEY: z.string().min(1).optional(),
   },
   client: {},
   runtimeEnv: {
@@ -33,5 +35,6 @@ export const env = createEnv({
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     MAIL_FROM: process.env.MAIL_FROM,
+    ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
   },
 })
