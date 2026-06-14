@@ -64,29 +64,25 @@ Recherchiere kurz und gib dann dein Tipp-Ergebnis als JSON aus.`
 
   const messages: AnthropicMessage[] = [{ role: "user", content: userPrompt }]
 
-  try {
-    let response = await callAnthropic(messages, systemPrompt, apiKey)
+  let response = await callAnthropic(messages, systemPrompt, apiKey)
 
-    // Tool-Use-Loop (max. 3 Runden)
-    for (let round = 0; round < 3 && response.stop_reason === "tool_use"; round++) {
-      const toolUses = response.content.filter((b): b is ToolUseBlock => b.type === "tool_use")
-      if (toolUses.length === 0) break
+  // Tool-Use-Loop (max. 3 Runden)
+  for (let round = 0; round < 3 && response.stop_reason === "tool_use"; round++) {
+    const toolUses = response.content.filter((b): b is ToolUseBlock => b.type === "tool_use")
+    if (toolUses.length === 0) break
 
-      // Anthropic erwartet assistant-Nachricht + tool_result in einer user-Nachricht
-      messages.push({ role: "assistant", content: response.content })
-      const toolResults: ToolResultBlock[] = toolUses.map((tu) => ({
-        type: "tool_result",
-        tool_use_id: tu.id,
-        content: "Suchergebnis empfangen.",
-      }))
-      messages.push({ role: "user", content: toolResults })
-      response = await callAnthropic(messages, systemPrompt, apiKey)
-    }
-
-    return extractScore(response)
-  } catch {
-    return null
+    // Anthropic erwartet assistant-Nachricht + tool_result in einer user-Nachricht
+    messages.push({ role: "assistant", content: response.content })
+    const toolResults: ToolResultBlock[] = toolUses.map((tu) => ({
+      type: "tool_result",
+      tool_use_id: tu.id,
+      content: "Suchergebnis empfangen.",
+    }))
+    messages.push({ role: "user", content: toolResults })
+    response = await callAnthropic(messages, systemPrompt, apiKey)
   }
+
+  return extractScore(response)
 }
 
 async function callAnthropic(

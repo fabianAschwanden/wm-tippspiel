@@ -16,34 +16,40 @@ function authorized(request: Request): boolean {
   return request.headers.get("authorization") === `Bearer ${env.CRON_SECRET}`
 }
 
-async function runBotTips(): Promise<{ tipped: number; skipped: number; errors: number }> {
-  if (!env.ANTHROPIC_API_KEY) return { tipped: 0, skipped: 0, errors: 0 }
+async function runBotTips(): Promise<{ tipped: number; skipped: number; errors: number; lastError?: string; apiKeySet: boolean }> {
+  const apiKeySet = !!env.ANTHROPIC_API_KEY
+  if (!env.ANTHROPIC_API_KEY) return { tipped: 0, skipped: 0, errors: 0, apiKeySet }
 
   const botId = await ensureBot()
   const existingTips = await tipsForPlayer(botId)
   const matches = await currentMatches()
   const now = Date.now()
-  const in24h = now + 24 * 60 * 60 * 1000
 
-  // Spiele, die in den nächsten 24h stattfinden und noch nicht getippt sind
+  // Alle noch nicht getippten Spiele, die noch nicht angepfiffen sind
   const upcoming = matches.filter((m) => {
     if (existingTips[m.id]) return false
-    const kickoff = new Date(m.kickoff).getTime()
-    return kickoff > now && kickoff <= in24h
+    return new Date(m.kickoff).getTime() > now
   })
 
   let tipped = 0
   let errors = 0
+  let lastError: string | undefined
   for (const match of upcoming) {
-    const score = await generateTip(match, env.ANTHROPIC_API_KEY)
-    if (score) {
-      await upsertTip(botId, match.id, score)
-      tipped++
-    } else {
+    try {
+      const score = await generateTip(match, env.ANTHROPIC_API_KEY)
+      if (score) {
+        await upsertTip(botId, match.id, score)
+        tipped++
+      } else {
+        errors++
+        lastError = `Kein Score für Spiel ${match.id}`
+      }
+    } catch (e) {
       errors++
+      lastError = e instanceof Error ? e.message : String(e)
     }
   }
-  return { tipped, skipped: matches.length - upcoming.length - errors, errors }
+  return { tipped, skipped: matches.length - upcoming.length, errors, lastError, apiKeySet }
 }
 
 async function runImport(request: Request): Promise<Response> {
