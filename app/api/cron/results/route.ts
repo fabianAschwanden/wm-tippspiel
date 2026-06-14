@@ -1,5 +1,5 @@
 import { env } from "env.mjs"
-import { generateTip } from "lib/bot"
+import { generateTips } from "lib/bot"
 import { footballDataProvider } from "lib/feed/football-data"
 import { importFeedMatches } from "lib/feed/import"
 import { ensureBot, tipsForPlayer, upsertTip } from "lib/server/db"
@@ -34,20 +34,20 @@ async function runBotTips(): Promise<{ tipped: number; skipped: number; errors: 
   let tipped = 0
   let errors = 0
   let lastError: string | undefined
-  for (const match of upcoming) {
-    try {
-      const score = await generateTip(match, env.ANTHROPIC_API_KEY)
+  try {
+    const scores = await generateTips(upcoming, env.ANTHROPIC_API_KEY)
+    for (const match of upcoming) {
+      const score = scores[match.id]
       if (score) {
         await upsertTip(botId, match.id, score)
         tipped++
       } else {
         errors++
-        lastError = `Kein Score für Spiel ${match.id}`
       }
-    } catch (e) {
-      errors++
-      lastError = e instanceof Error ? e.message : String(e)
     }
+  } catch (e) {
+    lastError = e instanceof Error ? e.message : String(e)
+    errors = upcoming.length
   }
   return { tipped, skipped: matches.length - upcoming.length, errors, lastError, apiKeySet }
 }
