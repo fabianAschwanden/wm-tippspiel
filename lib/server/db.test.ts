@@ -24,14 +24,14 @@ beforeAll(() => {
 
 describe("players", () => {
   it("registriert neue Spieler:innen und findet sie per E-Mail", async () => {
-    const player = await registerPlayer("Fabian", "fabian@example.com")
+    const player = await registerPlayer("User A", "user-a@example.com")
     expect(player).not.toBeNull()
-    expect((await findPlayerByEmail("fabian@example.com"))?.name).toBe("Fabian")
+    expect((await findPlayerByEmail("user-a@example.com"))?.name).toBe("User A")
   })
 
   it("lehnt doppelte E-Mail ab", async () => {
-    await registerPlayer("Eva", "eva@example.com")
-    expect(await registerPlayer("Eva Zwei", "eva@example.com")).toBeNull()
+    await registerPlayer("User B", "user-b@example.com")
+    expect(await registerPlayer("User B2", "user-b@example.com")).toBeNull()
   })
 })
 
@@ -100,6 +100,6 @@ describe("tips", () => {
     const tipper = everyone.find((p) => p.name === "Tipp")
     expect(tipper?.tips[1]).toEqual({ home: 3, away: 1 })
     // Spieler:innen ohne Tipps erscheinen ebenfalls (mit leerem Tipps-Objekt)
-    expect(everyone.find((p) => p.name === "Fabian")?.tips).toEqual({})
+    expect(everyone.find((p) => p.name === "User A")?.tips).toEqual({})
   })
 })

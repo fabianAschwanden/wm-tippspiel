@@ -12,16 +12,16 @@ function fakeIdToken(payload: Record<string, unknown>): string {
 const validPayload = {
   aud: CLIENT_ID,
   iss: "https://accounts.google.com",
-  email: "Fabian.Aschwanden@gmail.com",
+  email: "Test.User@example.com",
   email_verified: true,
-  name: "Fabian Aschwanden",
+  name: "Test User",
 }
 
 describe("parseGoogleIdToken", () => {
   it("liefert E-Mail (kleingeschrieben) und Name", () => {
     expect(parseGoogleIdToken(fakeIdToken(validPayload), CLIENT_ID)).toEqual({
-      email: "fabian.aschwanden@gmail.com",
-      name: "Fabian Aschwanden",
+      email: "test.user@example.com",
+      name: "Test User",
     })
   })
 
