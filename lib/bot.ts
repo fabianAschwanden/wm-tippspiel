@@ -77,13 +77,7 @@ function parseScores(text: string, matches: Match[]): Record<number, Score> {
   try {
     const parsed = JSON.parse(arrayMatch[0]) as unknown[]
     for (const item of parsed) {
-      if (
-        typeof item === "object" &&
-        item !== null &&
-        "id" in item &&
-        "home" in item &&
-        "away" in item
-      ) {
+      if (typeof item === "object" && item !== null && "id" in item && "home" in item && "away" in item) {
         const id = Number((item as Record<string, unknown>).id)
         const home = Number((item as Record<string, unknown>).home)
         const away = Number((item as Record<string, unknown>).away)

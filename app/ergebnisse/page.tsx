@@ -86,10 +86,12 @@ export default function ErgebnissePage() {
   const paginated = data.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   // Spieler-Reihenfolge aus allen Daten ableiten (konsistent über alle Seiten)
-  const allPlayers = data.flatMap((m) => m.tips).reduce<PlayerTipRow[]>((acc, t) => {
-    if (!acc.find((p) => p.playerId === t.playerId)) acc.push(t)
-    return acc
-  }, [])
+  const allPlayers = data
+    .flatMap((m) => m.tips)
+    .reduce<PlayerTipRow[]>((acc, t) => {
+      if (!acc.find((p) => p.playerId === t.playerId)) acc.push(t)
+      return acc
+    }, [])
   const columns = [...allPlayers.filter((p) => !p.isBot), ...allPlayers.filter((p) => p.isBot)]
 
   return (
@@ -105,7 +107,7 @@ export default function ErgebnissePage() {
             <div className="flex items-center justify-between gap-2 border-b border-gray-800 px-4 py-3">
               <div className="flex items-center gap-2 text-base font-bold">
                 <span title={match.homeTeam}>{match.homeFlag}</span>
-                <span className="tabular-nums text-white">
+                <span className="text-white tabular-nums">
                   {match.result.home}:{match.result.away}
                 </span>
                 <span title={match.awayTeam}>{match.awayFlag}</span>
@@ -158,7 +160,7 @@ export default function ErgebnissePage() {
           <button
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1}
-            className="rounded-lg border border-gray-700 px-3 py-1.5 text-sm text-gray-300 disabled:opacity-30 hover:border-emerald-700 hover:text-white transition-colors"
+            className="rounded-lg border border-gray-700 px-3 py-1.5 text-sm text-gray-300 transition-colors hover:border-emerald-700 hover:text-white disabled:opacity-30"
           >
             ← Neuer
           </button>
@@ -168,7 +170,7 @@ export default function ErgebnissePage() {
           <button
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}
-            className="rounded-lg border border-gray-700 px-3 py-1.5 text-sm text-gray-300 disabled:opacity-30 hover:border-emerald-700 hover:text-white transition-colors"
+            className="rounded-lg border border-gray-700 px-3 py-1.5 text-sm text-gray-300 transition-colors hover:border-emerald-700 hover:text-white disabled:opacity-30"
           >
             Älter →
           </button>
