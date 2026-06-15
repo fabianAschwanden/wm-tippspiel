@@ -369,10 +369,40 @@ function MatchTipRow({
         {/* Eingabe bzw. Endstand */}
         {finished && match.result ? (
           <div className="shrink-0 text-center">
-            <span className="text-2xl font-extrabold text-white tabular-nums">
-              {match.result.home}:{match.result.away}
-            </span>
-            <span className="block text-[10px] tracking-widest text-gray-400 uppercase">Endstand</span>
+            {tip ? (
+              <div className="flex items-center gap-1.5">
+                <div className="text-center">
+                  <span
+                    className={`text-xl font-extrabold tabular-nums ${
+                      earned === maxPointsFor(match.stage)
+                        ? "text-emerald-400"
+                        : earned !== null && earned >= 5 * stageFactor(match.stage)
+                          ? "text-emerald-500"
+                          : earned !== null && earned > 0
+                            ? "text-amber-400"
+                            : "text-red-400"
+                    }`}
+                  >
+                    {tip.home}:{tip.away}
+                  </span>
+                  <span className="block text-[10px] tracking-widest text-gray-500 uppercase">Tipp</span>
+                </div>
+                <span className="text-sm text-gray-600">→</span>
+                <div className="text-center">
+                  <span className="text-xl font-extrabold text-white tabular-nums">
+                    {match.result.home}:{match.result.away}
+                  </span>
+                  <span className="block text-[10px] tracking-widest text-gray-400 uppercase">Endstand</span>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <span className="text-2xl font-extrabold text-white tabular-nums">
+                  {match.result.home}:{match.result.away}
+                </span>
+                <span className="block text-[10px] tracking-widest text-gray-400 uppercase">Endstand</span>
+              </div>
+            )}
           </div>
         ) : (
           <>
@@ -407,13 +437,9 @@ function MatchTipRow({
       {finished &&
         match.result &&
         (tip && earned !== null ? (
-          <p className="mt-2.5 flex items-center justify-center gap-2 text-center text-xs text-gray-300">
-            Dein Tipp{" "}
-            <span className="font-bold text-white tabular-nums">
-              {tip.home}:{tip.away}
-            </span>
+          <p className="mt-2.5 text-center">
             <span
-              className={`rounded-full px-2 py-0.5 font-bold ${
+              className={`rounded-full px-2 py-0.5 text-xs font-bold ${
                 earned === maxPointsFor(match.stage)
                   ? "bg-emerald-500 text-emerald-950"
                   : earned >= 5 * factor
