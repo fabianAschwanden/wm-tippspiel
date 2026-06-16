@@ -165,38 +165,50 @@ export default function Dashboard() {
           </Link>
         </div>
         <ul className="space-y-3">
-          {upcoming.map((match) => (
-            <li
-              key={match.id}
-              className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-2xl border border-gray-800 bg-gray-900/80 p-4"
-            >
-              <div className="flex min-w-0 items-center gap-3">
-                <span className="text-2xl" title={match.home.name} aria-hidden>
-                  {match.home.flag}
-                </span>
-                <span className="truncate font-semibold" title={match.home.name}>
-                  {match.home.name}
-                </span>
-                <span className="text-gray-500">vs</span>
-                <span className="truncate font-semibold" title={match.away.name}>
-                  {match.away.name}
-                </span>
-                <span className="text-2xl" title={match.away.name} aria-hidden>
-                  {match.away.flag}
-                </span>
-              </div>
-              <div className="ml-auto shrink-0 text-right text-xs text-gray-400">
-                <p className="font-medium text-emerald-300">
-                  {match.stage === "Gruppenphase" ? `Gruppe ${match.group}` : match.stage}
-                </p>
-                <p>
-                  <span className="font-medium text-gray-300">{dayLabel(match.kickoff, now)}</span>
-                  {` · ${timeLabel(match.kickoff)}`}
-                  {match.venue ? ` · ${match.venue}` : ""}
-                </p>
-              </div>
-            </li>
-          ))}
+          {upcoming.map((match) => {
+            const tip = tips[match.id]
+            return (
+              <li
+                key={match.id}
+                className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-2xl border p-4 ${
+                  tip ? "border-emerald-800/50 bg-gray-900/80" : "border-gray-800 bg-gray-900/80"
+                }`}
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="text-2xl" title={match.home.name} aria-hidden>
+                    {match.home.flag}
+                  </span>
+                  <span className="truncate font-semibold" title={match.home.name}>
+                    {match.home.name}
+                  </span>
+                  <span className="text-gray-500">vs</span>
+                  <span className="truncate font-semibold" title={match.away.name}>
+                    {match.away.name}
+                  </span>
+                  <span className="text-2xl" title={match.away.name} aria-hidden>
+                    {match.away.flag}
+                  </span>
+                </div>
+                <div className="ml-auto shrink-0 text-right text-xs text-gray-400">
+                  <p className="font-medium text-emerald-300">
+                    {match.stage === "Gruppenphase" ? `Gruppe ${match.group}` : match.stage}
+                  </p>
+                  <p>
+                    <span className="font-medium text-gray-300">{dayLabel(match.kickoff, now)}</span>
+                    {` · ${timeLabel(match.kickoff)}`}
+                    {match.venue ? ` · ${match.venue}` : ""}
+                  </p>
+                  {tip ? (
+                    <p className="mt-0.5 font-semibold text-emerald-400 tabular-nums">
+                      Tipp: {tip.home}:{tip.away}
+                    </p>
+                  ) : player ? (
+                    <p className="mt-0.5 text-gray-600">kein Tipp</p>
+                  ) : null}
+                </div>
+              </li>
+            )
+          })}
         </ul>
       </section>
     </div>
