@@ -1,0 +1,57 @@
+# Vollscan-Konfiguration für den nächtlichen Tiefenscan (docs/08 §2) — projektunabhängig.
+# Identisch zur .scanner.yaml, aber mode=full (gesamte History aller Branches).
+# Ablageort im Ziel-Repo: .github/scanner/.scanner-full.yaml
+version: 1
+
+scan:
+  repositories:
+    - type: localGit
+      id: repo
+      path: .
+      branches: [main]
+
+  history:
+    mode: full
+
+  concurrency:
+    workers: 4
+    detectorTimeoutSeconds: 30
+
+  detectors:
+    secrets:
+      enabled: true
+      ruleset: gitleaks-default
+      entropy:
+        enabled: true
+        threshold: 4.5
+        minLength: 20
+        severity: MEDIUM
+    pii:
+      enabled: false
+      patterns: [iban, creditcard, email]
+    iac:
+      enabled: false
+
+  baseline: .github/scanner/.scanner-baseline.json
+
+  # Pfad-Suppression (FR-10): rauschanfällige Dateien ausnehmen (Lockfiles/Minified/Maps/Build-Output).
+  suppress:
+    - { path: '**/package-lock.json', reason: 'npm-Lockfile: Integrity-Hashes, keine Secrets' }
+    - { path: '**/yarn.lock',         reason: 'yarn-Lockfile: Hashes, keine Secrets' }
+    - { path: '**/pnpm-lock.yaml',    reason: 'pnpm-Lockfile: Hashes, keine Secrets' }
+    - { path: '**/*.min.js',          reason: 'Minified-Asset: hochentropisch, kein Klartext-Secret' }
+    - { path: '**/*.min.css',         reason: 'Minified-Asset' }
+    - { path: '**/*.map',             reason: 'Source-Map: generiert' }
+    - { path: '**/dist/**',           reason: 'Build-Output' }
+    - { path: '**/build/**',          reason: 'Build-Output' }
+
+  gate:
+    failOn: HIGH
+    failOnNewOnly: true
+    softFail: false
+    requireSuppressionReason: false
+
+  output:
+    formats: [sarif]
+    directory: ./scan-reports
+    redact: true
