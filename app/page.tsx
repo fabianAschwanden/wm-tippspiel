@@ -2,13 +2,16 @@
 
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
+import { ScoreStepper } from "components/ScoreStepper/ScoreStepper"
 import { ScoringRules } from "components/ScoringRules/ScoringRules"
-import { fetchLeaderboard, fetchMe, fetchTips } from "lib/api"
+import { fetchLeaderboard, fetchMe, fetchTips, saveTip } from "lib/api"
 import { dayLabel, timeLabel } from "lib/dates"
 import { useLive, useMatches } from "lib/hooks"
 import { rankOf } from "lib/leaderboard"
 import { pointsForTip } from "lib/scoring"
-import type { Player, PlayerAccount, Tips } from "lib/types"
+import type { Match, Player, PlayerAccount, Tips } from "lib/types"
+
+const H24 = 24 * 60 * 60 * 1000
 
 export default function Dashboard() {
   const [player, setPlayer] = useState<PlayerAccount | null>(null)
@@ -31,13 +34,27 @@ export default function Dashboard() {
     })
   }, [])
 
+  const handleTip = (matchId: number, side: "home" | "away", goals: number) => {
+    const existing = tips[matchId]
+    const updated = { home: 0, away: 0, ...existing, [side]: goals }
+    setTips((prev) => ({ ...prev, [matchId]: updated }))
+    void saveTip(matchId, updated)
+  }
+
   const points = leaderboard.find((p) => p.isCurrentUser)?.points ?? 0
   const rank = player ? rankOf(leaderboard, player.id) : 0
-  // erst nach Client-Mount (now gesetzt) werden bereits angepfiffene Spiele ausgeblendet
-  const upcoming = matches
-    .filter((m) => !m.result && (now === null || new Date(m.kickoff).getTime() > now))
-    .sort((a, b) => a.kickoff.localeCompare(b.kickoff))
-    .slice(0, 4)
+
+  // Mindestens die nächsten 4 Spiele, plus alle weiteren innerhalb der nächsten 24h
+  const upcoming = useMemo(() => {
+    if (now === null) return []
+    const sorted = matches
+      .filter((m) => !m.result && new Date(m.kickoff).getTime() > now)
+      .sort((a, b) => a.kickoff.localeCompare(b.kickoff))
+    const base = sorted.slice(0, 4)
+    const deadline =
+      base.length > 0 ? Math.max(now + H24, new Date(base[base.length - 1]!.kickoff).getTime()) : now + H24
+    return sorted.filter((m) => new Date(m.kickoff).getTime() <= deadline)
+  }, [matches, now])
 
   const liveMatches = useMemo(() => {
     const byId = new Map(matches.map((m) => [m.id, m]))
@@ -135,7 +152,7 @@ export default function Dashboard() {
                     <p className="inline-flex items-center gap-1.5 rounded-full bg-emerald-900/80 px-2 py-0.5 font-bold text-emerald-300">
                       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" aria-hidden />
                       {score.status === "PAUSED" ? "Pause" : "LIVE"}
-                      {score.minute !== null ? ` ${score.minute}’` : ""}
+                      {score.minute !== null ? ` ${score.minute}'` : ""}
                     </p>
                     {tip && (
                       <p className="mt-1 text-gray-400">
@@ -157,60 +174,105 @@ export default function Dashboard() {
       <section>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-bold text-white">Nächste Spiele</h2>
-          <Link
-            href="/tipps"
-            className="rounded-full bg-emerald-600 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-500"
-          >
-            Jetzt tippen
+          <Link href="/tipps" className="text-sm text-emerald-400 underline-offset-2 hover:underline">
+            Alle Tipps →
           </Link>
         </div>
         <ul className="space-y-3">
-          {upcoming.map((match) => {
-            const tip = tips[match.id]
-            return (
-              <li
-                key={match.id}
-                className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-2xl border p-4 ${
-                  tip ? "border-emerald-800/50 bg-gray-900/80" : "border-gray-800 bg-gray-900/80"
-                }`}
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="text-2xl" title={match.home.name} aria-hidden>
-                    {match.home.flag}
-                  </span>
-                  <span className="truncate font-semibold" title={match.home.name}>
-                    {match.home.name}
-                  </span>
-                  <span className="text-gray-500">vs</span>
-                  <span className="truncate font-semibold" title={match.away.name}>
-                    {match.away.name}
-                  </span>
-                  <span className="text-2xl" title={match.away.name} aria-hidden>
-                    {match.away.flag}
-                  </span>
-                </div>
-                <div className="ml-auto shrink-0 text-right text-xs text-gray-400">
-                  <p className="font-medium text-emerald-300">
-                    {match.stage === "Gruppenphase" ? `Gruppe ${match.group}` : match.stage}
-                  </p>
-                  <p>
-                    <span className="font-medium text-gray-300">{dayLabel(match.kickoff, now)}</span>
-                    {` · ${timeLabel(match.kickoff)}`}
-                    {match.venue ? ` · ${match.venue}` : ""}
-                  </p>
-                  {tip ? (
-                    <p className="mt-0.5 font-semibold text-emerald-400 tabular-nums">
-                      Tipp: {tip.home}:{tip.away}
-                    </p>
-                  ) : player ? (
-                    <p className="mt-0.5 text-gray-600">kein Tipp</p>
-                  ) : null}
-                </div>
-              </li>
-            )
-          })}
+          {upcoming.map((match) => (
+            <UpcomingMatchRow
+              key={match.id}
+              match={match}
+              tip={tips[match.id]}
+              canTip={!!player}
+              now={now}
+              onTip={handleTip}
+            />
+          ))}
         </ul>
       </section>
     </div>
+  )
+}
+
+function UpcomingMatchRow({
+  match,
+  tip,
+  canTip,
+  now,
+  onTip,
+}: {
+  match: Match
+  tip: { home: number; away: number } | undefined
+  canTip: boolean
+  now: number | null
+  onTip: (matchId: number, side: "home" | "away", goals: number) => void
+}) {
+  const hasTip = tip !== undefined
+  return (
+    <li
+      className={`rounded-2xl border p-4 transition-colors ${
+        hasTip ? "border-emerald-800/50 bg-gray-900/80" : "border-gray-800 bg-gray-900/80"
+      }`}
+    >
+      {/* Kopfzeile: Stage + Zeit */}
+      <div className="mb-2 flex items-center justify-between text-xs text-gray-500">
+        <span className="font-medium text-emerald-300">
+          {match.stage === "Gruppenphase" ? `Gruppe ${match.group}` : match.stage}
+        </span>
+        <span>
+          <span className="font-medium text-gray-300">{dayLabel(match.kickoff, now)}</span>
+          {` · ${timeLabel(match.kickoff)}`}
+          {match.venue ? ` · ${match.venue}` : ""}
+        </span>
+      </div>
+
+      {/* Teams + Tipp-Eingabe oder angezeigter Tipp */}
+      <div className="flex items-center justify-between gap-2">
+        {/* Heim */}
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-2 text-right">
+          <span className="truncate font-semibold" title={match.home.name}>
+            {match.home.name}
+          </span>
+          <span className="text-2xl" aria-hidden>
+            {match.home.flag}
+          </span>
+        </div>
+
+        {/* Mitte: Tipp-Eingabe oder Tipp anzeigen */}
+        {canTip ? (
+          <div className="flex shrink-0 items-center gap-1.5">
+            <ScoreStepper
+              value={tip?.home ?? null}
+              ariaLabel={`Tore ${match.home.name}`}
+              disabled={false}
+              onChange={(goals) => onTip(match.id, "home", goals)}
+            />
+            <span className="text-gray-500">:</span>
+            <ScoreStepper
+              value={tip?.away ?? null}
+              ariaLabel={`Tore ${match.away.name}`}
+              disabled={false}
+              onChange={(goals) => onTip(match.id, "away", goals)}
+            />
+          </div>
+        ) : (
+          <span className="shrink-0 text-sm text-gray-600">vs</span>
+        )}
+
+        {/* Auswärts */}
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="text-2xl" aria-hidden>
+            {match.away.flag}
+          </span>
+          <span className="truncate font-semibold" title={match.away.name}>
+            {match.away.name}
+          </span>
+        </div>
+      </div>
+
+      {/* Tipp-Status */}
+      {canTip && !hasTip && <p className="mt-2 text-center text-xs text-amber-400">Noch kein Tipp abgegeben</p>}
+    </li>
   )
 }
