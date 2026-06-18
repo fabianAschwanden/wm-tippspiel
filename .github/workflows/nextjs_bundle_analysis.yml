@@ -18,6 +18,9 @@ defaults:
 
 jobs:
   analyze:
+    permissions:
+      contents: read
+      pull-requests: write
     env:
       SKIP_ENV_VALIDATION: true
     runs-on: ubuntu-latest
